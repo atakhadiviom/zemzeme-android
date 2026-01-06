@@ -1,308 +1,272 @@
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/188c42f8-d249-4a72-b27a-e2b4f10a00a8" alt="Bitchat Android Logo" width="480">
+  <img src="docs/logo.png" alt="Zemzeme" width="160"/>
 </p>
 
-> [!WARNING]
-> This software has not received external security review and may contain vulnerabilities and may not necessarily meet its stated security goals. Do not use it for sensitive use cases, and do not rely on its security until it has been reviewed. Work in progress.
+<h1 align="center">Zemzeme</h1>
 
-# bitchat for Android
+<p align="center"><strong>Private, serverless messaging — no accounts, no internet required.</strong></p>
 
-A secure, decentralized, peer-to-peer messaging app that works over Bluetooth mesh networks. No internet required for mesh chats, no servers, no phone numbers - just pure encrypted communication. Bitchat also supports geohash channels, which use an internet connection to connect you with others in your geographic area.
+Zemzeme is a fork of [bitchat](https://github.com/permissionlesstech/bitchat-android) (v1.7.0) for Android, extended with a second internet-capable transport layer built on [libp2p](https://libp2p.io). It supports three independent communication methods that can operate simultaneously: offline Bluetooth mesh, direct peer-to-peer over the internet (via libp2p + ICE), and relay-based messaging via the Nostr protocol. All messages are end-to-end encrypted. No registration, no phone number, no central server.
 
-This is the **Android port** of the original [bitchat iOS app](https://github.com/jackjackbits/bitchat), maintaining 100% protocol compatibility for cross-platform communication.
+---
 
-## Install bitchat
+## Acknowledgements
 
-You can download the latest version of bitchat for Android from the [GitHub Releases page](https://github.com/permissionlesstech/bitchat-android/releases).
+Zemzeme stands on the shoulders of the [**bitchat team**](https://github.com/permissionlesstech/bitchat-android) and its contributors. The core BLE mesh architecture, Noise protocol integration, gossip-based relay, and the original application design are their work. We are grateful for their commitment to open, private, decentralised communication.
 
-Or you can:
+> **Forked from bitchat v1.7.0**
 
-[<img alt="Get it on Google Play" height="60" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"/>](https://play.google.com/store/apps/details?id=com.bitchat.droid)
-
-**Instructions:**
-
-1.  **Download the APK:** On your Android device, navigate to the link above and download the latest `.apk` file. Open it.
-2.  **Allow Unknown Sources:** On some devices, before you can install the APK, you may need to enable "Install from unknown sources" in your device's settings. This is typically found under **Settings > Security** or **Settings > Apps & notifications > Special app access**.
-3.  **Install:** Open the downloaded `.apk` file to begin the installation.
-
-## License
-
-This project is released into the public domain. See the [LICENSE](LICENSE.md) file for details.
+---
 
 ## Features
 
-- **✅ Cross-Platform Compatible**: Full protocol compatibility with iOS bitchat
-- **✅ Decentralized Mesh Network**: Automatic peer discovery and multi-hop message relay over Bluetooth LE
-- **✅ End-to-End Encryption**: X25519 key exchange + AES-256-GCM for private messages
-- **✅ Channel-Based Chats**: Topic-based group messaging with optional password protection
-- **✅ Store & Forward**: Messages cached for offline peers and delivered when they reconnect
-- **✅ Privacy First**: No accounts, no phone numbers, no persistent identifiers
-- **✅ IRC-Style Commands**: Familiar `/join`, `/msg`, `/who` style interface
-- **✅ Message Retention**: Optional channel-wide message saving controlled by channel owners
-- **✅ Emergency Wipe**: Triple-tap logo to instantly clear all data
-- **✅ Modern Android UI**: Jetpack Compose with Material Design 3
-- **✅ Dark/Light Themes**: Terminal-inspired aesthetic matching iOS version
-- **✅ Battery Optimization**: Adaptive scanning and power management
+### Messaging
+- Text messages with formatting and `@mention` support
+- Voice notes (compressed audio)
+- Image and file sharing (chunked binary transfer)
+- Read receipts and delivery indicators
+- Password-protected channels
 
-## Android Setup
+### Transport Layers
+| Layer | Medium | Internet Required |
+|---|---|---|
+| BLE Mesh | Bluetooth LE | No |
+| P2P / ICE | Wi-Fi / Mobile | Yes |
+| Nostr | Wi-Fi / Mobile (relay) | Yes |
 
-### Prerequisites
+All three layers operate simultaneously; the app routes messages through whichever paths are available and falls back automatically.
 
-- **Android Studio**: Arctic Fox (2020.3.1) or newer
-- **Android SDK**: API level 26 (Android 8.0) or higher
-- **Kotlin**: 1.8.0 or newer
-- **Gradle**: 7.0 or newer
+### Location & Channels
+- Geohash-based public channels (city → country granularity)
+- Custom named group chats
+- Geographic group auto-discovery
 
-### Build Instructions
+### Security
+- **Noise Protocol** (Noise_NK, Curve25519 + ChaCha20-Poly1305) for all peer sessions
+- **Ed25519** signed QR codes for peer identity verification
+- **BouncyCastle PBKDF2** PIN hashing
+- **EncryptedSharedPreferences** (AES-256-GCM) for all local secrets
+- Biometric + PIN app lock (optional)
+- No GPS coordinates transmitted — only coarse geohash
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/permissionlesstech/bitchat-android.git
-   cd bitchat-android
-   ```
+### Privacy
+- No account or phone number required
+- Zero central server; all state is local or peer-to-peer
+- BLE mesh relays use hop-by-hop encryption
+- Tor integration (optional, in progress)
 
-2. **Open in Android Studio:**
-   ```bash
-   # Open Android Studio and select "Open an Existing Project"
-   # Navigate to the bitchat-android directory
-   ```
+---
 
-3. **Build the project:**
-   ```bash
-   ./gradlew build
-   ```
+## Architecture
 
-4. **Install on device:**
-   ```bash
-   ./gradlew installDebug
-   ```
-
-### Development Build
-
-For development builds with debugging enabled:
-
-```bash
-./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+┌──────────────────────────────────────────────────────────┐
+│                    Jetpack Compose UI                    │
+├──────────────────────────────────────────────────────────┤
+│                      ChatViewModel                       │
+├───────────────────┬──────────────────┬───────────────────┤
+│     BLE Mesh      │  P2P (libp2p)    │      Nostr        │
+│                   │                  │                   │
+│ BluetoothMesh     │ P2PTransport     │ NostrTransport    │
+│ Service           │ P2PLibraryRepo   │ NostrRelayManager │
+│                   │ golib.aar (Go)   │ NostrClient       │
+├───────────────────┴──────────────────┴───────────────────┤
+│              EncryptionService (Noise Protocol)          │
+│              NoiseEncryptionService                      │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### Release Build
+### BLE Mesh
+The original bitchat mesh engine. Devices discover each other via BLE advertising and scanning, exchange messages over GATT, and relay packets through nearby devices using TTL-based store-and-forward. Duplicate suppression uses a GCS Bloom filter (Gossip Sync).
 
-For production releases:
+### P2P Transport (libp2p)
+An additional transport layer, unique to this fork. A pre-compiled Go library (`golib.aar`) built with [gomobile](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) wraps [**libp2p**](https://libp2p.io) — the open-source peer-to-peer networking library originally developed by Protocol Labs and used by IPFS, Filecoin, and Ethereum 2. It provides:
+
+- **Direct ICE connections** between peers through NATs and firewalls (no relay server needed once connected)
+- **DHT peer discovery** using the IPFS bootstrap network
+- **GossipSub** pub/sub for topic-based channels
+- **Media chunking** — files split into ≤ 200 KB chunks sent in parallel
+
+libp2p is an independent open-source project. Source: [https://libp2p.io](https://libp2p.io) · GitHub: [libp2p/go-libp2p](https://github.com/libp2p/go-libp2p)
+
+### Nostr Transport
+Uses the [Nostr](https://nostr.com) protocol for relay-based messaging. Supports private DMs (Curve25519-XChaCha20-Poly1305), geohash channels, proof-of-work, and fragment reassembly for large messages.
+
+---
+
+## Requirements
+
+| Requirement | Details |
+|---|---|
+| Android | 8.0 (API 26) or higher |
+| Bluetooth | Bluetooth LE (BLE) capable device |
+| Permissions | See [Permissions](#permissions) |
+
+---
+
+## Building from Source
+
+### Prerequisites
+- Android Studio Hedgehog or later
+- JDK 17
+- Android SDK with API 35
+
+### Clone and Build
 
 ```bash
+git clone https://github.com/whisperbit-labs/zemzeme-android.git
+cd zemzeme-android
+```
+
+Open in Android Studio and sync Gradle, or build from the command line:
+
+```bash
+# Debug build
+./gradlew assembleDebug
+
+# Release build (requires signing config in local.properties)
 ./gradlew assembleRelease
 ```
 
-## Android-Specific Requirements
+### Signing (Release)
 
-### Permissions
+Create `local.properties` (not committed) and add:
 
-The app requires the following permissions (automatically requested):
+```properties
+KEYSTORE_FILE=/path/to/your/keystore.jks
+KEYSTORE_PASSWORD=your_keystore_password
+KEY_ALIAS=your_key_alias
+KEY_PASSWORD=your_key_password
+```
 
-- **Bluetooth**: Core BLE functionality
-- **Location**: Required for BLE scanning on Android
-- **Network**: Expand your mesh through public internet relays
-- **Notifications**: Message alerts and background updates
+### APK Splits
 
-### Hardware Requirements
+The build produces architecture-specific APKs automatically:
 
-- **Bluetooth LE (BLE)**: Required for mesh networking
-- **Android 8.0+**: API level 26 minimum
-- **RAM**: 2GB recommended for optimal performance
+| ABI | File suffix |
+|---|---|
+| arm64-v8a | `...-arm64-v8a-release.apk` |
+| armeabi-v7a | `...-armeabi-v7a-release.apk` |
+| x86_64 | `...-x86_64-release.apk` |
 
-## Usage
+---
 
-### Basic Commands
+## Installation
 
-- `/j #channel` - Join or create a channel
-- `/m @name message` - Send a private message
-- `/w` - List online users
-- `/channels` - Show all discovered channels
-- `/block @name` - Block a peer from messaging you
-- `/block` - List all blocked peers
-- `/unblock @name` - Unblock a peer
-- `/clear` - Clear chat messages
-- `/pass [password]` - Set/change channel password (owner only)
-- `/transfer @name` - Transfer channel ownership
-- `/save` - Toggle message retention for channel (owner only)
+### From Release APK
+1. Download the APK matching your device architecture from the [Releases](../../releases) page
+2. Enable **Install from unknown sources** in Android settings
+3. Open the APK and install
 
-### Getting Started
+### From Source
+Build the debug APK and install via ADB:
 
-1. **Install the app** on your Android device (requires Android 8.0+)
-2. **Grant permissions** for Bluetooth and location when prompted
-3. **Launch bitchat** - it will auto-start mesh networking
-4. **Set your nickname** or use the auto-generated one
-5. **Connect automatically** to nearby iOS and Android bitchat users
-6. **Join a channel** with `/j #general` or start chatting in public
-7. **Messages relay** through the mesh network to reach distant peers
+```bash
+./gradlew assembleDebug
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
 
-### Android UI Features
+---
 
-- **Jetpack Compose UI**: Modern Material Design 3 interface
-- **Dark/Light Themes**: Terminal-inspired aesthetic matching iOS
-- **Haptic Feedback**: Vibrations for interactions and notifications
-- **Adaptive Layout**: Optimized for various Android screen sizes
-- **Message Status**: Real-time delivery and read receipts
-- **RSSI Indicators**: Signal strength colors for each peer
+## Permissions
 
-### Channel Features
+| Permission | Why |
+|---|---|
+| `BLUETOOTH_SCAN / CONNECT / ADVERTISE` | BLE mesh peer discovery and communication |
+| `ACCESS_FINE_LOCATION` | Required by Android for BLE scanning |
+| `ACCESS_BACKGROUND_LOCATION` | Keep mesh active while app is backgrounded |
+| `INTERNET` | P2P (libp2p) and Nostr transport |
+| `FOREGROUND_SERVICE` | Persistent background mesh relay |
+| `RECEIVE_BOOT_COMPLETED` | Auto-start mesh on device boot |
+| `POST_NOTIFICATIONS` | Message notifications |
+| `CAMERA` | QR code scanning for peer verification |
+| `RECORD_AUDIO` | Voice notes |
+| `READ_MEDIA_IMAGES / AUDIO / VIDEO` | Media sharing |
+| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Reliable background operation |
 
-- **Password Protection**: Channel owners can set passwords with `/pass`
-- **Message Retention**: Owners can enable mandatory message saving with `/save`
-- **@ Mentions**: Use `@nickname` to mention users (with autocomplete)
-- **Ownership Transfer**: Pass control to trusted users with `/transfer`
+Zemzeme does **not** access contacts, call logs, SMS, or any external account.
 
-## Security & Privacy
+---
 
-### Encryption
-- **Private Messages**: X25519 key exchange + AES-256-GCM encryption
-- **Channel Messages**: Argon2id password derivation + AES-256-GCM
-- **Digital Signatures**: Ed25519 for message authenticity
-- **Forward Secrecy**: New key pairs generated each session
+## Getting Started
 
-### Privacy Features
-- **No Registration**: No accounts, emails, or phone numbers required
-- **Ephemeral by Default**: Messages exist only in device memory
-- **Cover Traffic**: Random delays and dummy messages prevent traffic analysis
-- **Emergency Wipe**: Triple-tap logo to instantly clear all data
-- **Bundled Tor Support**: Built-in Tor network integration for enhanced privacy when internet connectivity is available
+1. **Launch** the app — no registration needed
+2. **Grant permissions** when prompted (Bluetooth, location, notifications)
+3. **Pick a nickname** — used only locally and in messages to peers
+4. The **Bluetooth** group is the local BLE mesh; nearby Zemzeme users appear automatically
+5. Tap **+** on the home screen to join a geohash channel or start a private chat
+6. Scan a peer's **QR code** (from the verification sheet) to confirm their identity
 
-## Performance & Efficiency
+### App Lock (optional)
+Go to **Settings → App Lock** to enable PIN + biometric protection. The lock screen appears every time the app returns to the foreground.
 
-### Message Compression
-- **LZ4 Compression**: Automatic compression for messages >100 bytes
-- **30-70% bandwidth savings** on typical text messages
-- **Smart compression**: Skips already-compressed data
+---
 
-### Battery Optimization
-- **Adaptive Power Modes**: Automatically adjusts based on battery level
-  - Performance mode: Full features when charging or >60% battery
-  - Balanced mode: Default operation (30-60% battery)
-  - Power saver: Reduced scanning when <30% battery
-  - Ultra-low power: Emergency mode when <10% battery
-- **Background efficiency**: Automatic power saving when app backgrounded
-- **Configurable scanning**: Duty cycle adapts to battery state
+## Project Structure
 
-### Network Efficiency
-- **Optimized Bloom filters**: Faster duplicate detection with less memory
-- **Message aggregation**: Batches small messages to reduce transmissions
-- **Adaptive connection limits**: Adjusts peer connections based on power mode
+```
+app/src/main/java/com/roman/zemzeme/
+├── crypto/            Noise protocol & symmetric encryption
+├── favorites/         Peer bookmarking & persistence
+├── geohash/           Location channels and geohash utilities
+├── mesh/              BLE mesh engine (BluetoothMeshService, GATT managers)
+├── nostr/             Nostr client, relay manager, DM handler
+├── onboarding/        First-run flow, app lock setup
+├── p2p/               libp2p/ICE transport, chunk assembler
+├── security/          AppLockManager, PIN hashing
+├── services/          QR verification, identity, background services
+├── ui/                Jetpack Compose screens and sheets
+│   ├── theme/         Color scheme (ElectricCyan), typography (Nunito)
+│   └── media/         Image viewer, file animations
+└── MainActivity.kt    Entry point, navigation, lifecycle
+```
 
-## Technical Architecture
+---
 
-### Binary Protocol
-bitchat uses an efficient binary protocol optimized for Bluetooth LE:
-- Compact packet format with 1-byte type field
-- TTL-based message routing (max 7 hops)
-- Automatic fragmentation for large messages
-- Message deduplication via unique IDs
+## Technology Stack
 
-### Mesh Networking
-- Each device acts as both client and peripheral
-- Automatic peer discovery and connection management
-- Store-and-forward for offline message delivery
-- Adaptive duty cycling for battery optimization
+| Component | Library / Version |
+|---|---|
+| UI | Jetpack Compose + Material 3 |
+| Font | Nunito (SIL OFL) |
+| BLE | Nordic Semiconductor BLE library 2.6.1 |
+| P2P | libp2p (Go, via gomobile · golib.aar) |
+| Nostr | Custom Kotlin client over OkHttp WebSocket |
+| Encryption | BouncyCastle 1.70, Google Tink 1.10.0 |
+| QR Generation | ZXing 3.5.4 |
+| QR Scanning | ML Kit Barcode Scanning 17.3.0 |
+| Camera | CameraX 1.5.2 |
+| Location | Google Play Services Location 21.3.0 |
+| Biometric | AndroidX Biometric 1.1.0 |
+| Secure Storage | AndroidX Security Crypto 1.1.0-beta01 |
+| JSON | Gson 2.13.1 |
+| Coroutines | Kotlin Coroutines 1.10.2 |
 
-### Android-Specific Optimizations
-- **Coroutine Architecture**: Asynchronous operations for mesh networking
-- **Kotlin Coroutines**: Thread-safe concurrent mesh operations
-- **EncryptedSharedPreferences**: Secure storage for user settings
-- **Lifecycle-Aware**: Proper handling of Android app lifecycle
-- **Battery Optimization**: Foreground service and adaptive scanning
-
-## Android Technical Architecture
-
-### Core Components
-
-1. **BitchatApplication.kt**: Application-level initialization and dependency injection
-2. **MainActivity.kt**: Main activity handling permissions and UI hosting
-3. **ChatViewModel.kt**: MVVM pattern managing app state and business logic
-4. **BluetoothMeshService.kt**: Core BLE mesh networking (central + peripheral roles)
-5. **EncryptionService.kt**: Cryptographic operations using BouncyCastle
-6. **BinaryProtocol.kt**: Binary packet encoding/decoding matching iOS format
-7. **ChatScreen.kt**: Jetpack Compose UI with Material Design 3
-
-### Dependencies
-
-- **Jetpack Compose**: Modern declarative UI
-- **BouncyCastle**: Cryptographic operations (X25519, Ed25519, AES-GCM)
-- **Nordic BLE Library**: Reliable Bluetooth LE operations
-- **Kotlin Coroutines**: Asynchronous programming
-- **LZ4**: Message compression (when enabled)
-- **EncryptedSharedPreferences**: Secure local storage
-
-### Binary Protocol Compatibility
-
-The Android implementation maintains 100% binary protocol compatibility with iOS:
-- **Header Format**: Identical 13-byte header structure
-- **Packet Types**: Same message types and routing logic
-- **Encryption**: Identical cryptographic algorithms and key exchange
-- **UUIDs**: Same Bluetooth service and characteristic identifiers
-- **Fragmentation**: Compatible message fragmentation for large content
-
-## Publishing to Google Play
-
-### Preparation
-
-1. **Update version information:**
-   ```kotlin
-   // In app/build.gradle.kts
-   defaultConfig {
-       versionCode = 2  // Increment for each release
-       versionName = "1.1.0"  // User-visible version
-   }
-   ```
-
-2. **Create a signed release build:**
-   ```bash
-   ./gradlew assembleRelease
-   ```
-
-3. **Generate app bundle (recommended for Play Store):**
-   ```bash
-   ./gradlew bundleRelease
-   ```
-
-### Play Store Requirements
-
-- **Target API**: Latest Android API (currently 34)
-- **Privacy Policy**: Required for apps requesting sensitive permissions
-- **App Permissions**: Justify Bluetooth and location usage
-- **Content Rating**: Complete questionnaire for age-appropriate content
-
-### Distribution
-
-- **Google Play Store**: Main distribution channel
-- **F-Droid**: For open-source distribution
-- **Direct APK**: For testing and development
-
-## Cross-Platform Communication
-
-This Android port enables seamless communication with the original iOS bitchat app:
-
-- **iPhone ↔ Android**: Full bidirectional messaging
-- **Mixed Groups**: iOS and Android users in same channels
-- **Feature Parity**: All commands and encryption work across platforms
-- **Protocol Sync**: Identical message format and routing behavior
-
-**iOS Version**: For iPhone/iPad users, get the original bitchat at [github.com/jackjackbits/bitchat](https://github.com/jackjackbits/bitchat)
+---
 
 ## Contributing
 
-Contributions are welcome! Key areas for enhancement:
+Pull requests are welcome. For significant changes, please open an issue first to discuss the approach.
 
-1. **Performance**: Battery optimization and connection reliability
-2. **UI/UX**: Additional Material Design 3 features
-3. **Security**: Enhanced cryptographic features
-4. **Testing**: Unit and integration test coverage
-5. **Documentation**: API documentation and development guides
+```bash
+# Create a feature branch
+git checkout -b feature/your-feature
 
-## Support & Issues
+# Make your changes, then push
+git push origin feature/your-feature
+```
 
-- **Bug Reports**: [Create an issue](../../issues) with device info and logs
-- **Feature Requests**: [Start a discussion](https://github.com/orgs/permissionlesstech/discussions)
-- **Security Issues**: Email security concerns privately
-- **iOS Compatibility**: Cross-reference with [original iOS repo](https://github.com/jackjackbits/bitchat)
+---
 
-For iOS-specific issues, please refer to the [original iOS bitchat repository](https://github.com/jackjackbits/bitchat).
+## License
+
+This project inherits the open-source license of the original [bitchat](https://github.com/permissionlesstech/bitchat-android) project. The bundled `golib.aar` is compiled from [go-libp2p](https://github.com/libp2p/go-libp2p) which is licensed under the MIT License.
+
+---
+
+## Credits
+
+- **[bitchat](https://github.com/permissionlesstech/bitchat-android)** — The original project this fork is based on. Thank you to the entire bitchat team for building a solid, privacy-first foundation and for making it open source.
+- **[libp2p](https://libp2p.io)** — The modular peer-to-peer networking stack powering the P2P/ICE transport layer.
+- **[Protocol Labs](https://protocol.ai)** — Creators of libp2p, IPFS, and the broader decentralised web infrastructure that Zemzeme benefits from.
+- **[Nostr Protocol](https://nostr.com)** — Simple, open protocol for decentralised social applications.
