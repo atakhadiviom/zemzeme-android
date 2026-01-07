@@ -27,6 +27,13 @@ class NostrRelayManager private constructor() {
         private const val TAG = "NostrRelayManager"
         
         /**
+         * Global flag to enable/disable Nostr connections.
+         * When set to false, new connections will not be established.
+         */
+        @Volatile
+        var isEnabled: Boolean = true
+        
+        /**
          * Get instance for Android compatibility (context-aware calls)
          */
         fun getInstance(context: android.content.Context): NostrRelayManager {
@@ -129,6 +136,12 @@ class NostrRelayManager private constructor() {
      * Compute and connect to relays for a given geohash (nearest + optional defaults), cache the mapping.
      */
     fun ensureGeohashRelaysConnected(geohash: String, nRelays: Int = 5, includeDefaults: Boolean = false) {
+        // Check if Nostr is enabled
+        if (!isEnabled) {
+            Log.d(TAG, "Nostr is disabled, skipping geohash relay connection for $geohash")
+            return
+        }
+        
         try {
             val nearest = RelayDirectory.closestRelaysForGeohash(geohash, nRelays)
             val selected = if (includeDefaults) {
@@ -164,6 +177,12 @@ class NostrRelayManager private constructor() {
         includeDefaults: Boolean = false,
         nRelays: Int = 5
     ): String {
+        // Check if Nostr is enabled
+        if (!isEnabled) {
+            Log.d(TAG, "Nostr is disabled, skipping subscribeForGeohash for $geohash")
+            return id
+        }
+        
         ensureGeohashRelaysConnected(geohash, nRelays, includeDefaults)
         val relayUrls = getRelaysForGeohash(geohash)
         Log.d(TAG, "📡 Subscribing id=$id for geohash=$geohash on ${relayUrls.size} relays")
@@ -184,6 +203,12 @@ class NostrRelayManager private constructor() {
      * Send an event specifically to a geohash's relays (+ optional defaults).
      */
     fun sendEventToGeohash(event: NostrEvent, geohash: String, includeDefaults: Boolean = false, nRelays: Int = 5) {
+        // Check if Nostr is enabled
+        if (!isEnabled) {
+            Log.d(TAG, "Nostr is disabled, skipping sendEventToGeohash for $geohash")
+            return
+        }
+        
         ensureGeohashRelaysConnected(geohash, nRelays, includeDefaults)
         val relayUrls = getRelaysForGeohash(geohash)
         if (relayUrls.isEmpty()) {
@@ -198,6 +223,12 @@ class NostrRelayManager private constructor() {
     // --- Internal helpers ---
 
     private fun ensureConnectionsFor(relayUrls: Set<String>) {
+        // Check if Nostr is enabled
+        if (!isEnabled) {
+            Log.d(TAG, "Nostr is disabled, skipping connection for ${relayUrls.size} relays")
+            return
+        }
+        
         // Ensure relays are tracked for UI/status
         relayUrls.forEach { url ->
             if (relaysList.none { it.url == url }) {
@@ -242,6 +273,12 @@ class NostrRelayManager private constructor() {
      * Connect to all configured relays
      */
     fun connect() {
+        // Check if Nostr is enabled
+        if (!isEnabled) {
+            Log.d(TAG, "Nostr is disabled, skipping relay connection")
+            return
+        }
+        
         Log.d(TAG, "🌐 Connecting to ${relaysList.size} Nostr relays")
         
         scope.launch {
@@ -280,6 +317,12 @@ class NostrRelayManager private constructor() {
      * Send an event to specified relays (or all if none specified)
      */
     fun sendEvent(event: NostrEvent, relayUrls: List<String>? = null) {
+        // Check if Nostr is enabled
+        if (!isEnabled) {
+            Log.d(TAG, "Nostr is disabled, skipping sendEvent for kind=${event.kind}")
+            return
+        }
+        
         val targetRelays = relayUrls ?: relaysList.map { it.url }
         
         // Add to queue for reliability
@@ -308,6 +351,12 @@ class NostrRelayManager private constructor() {
         handler: (NostrEvent) -> Unit,
         targetRelayUrls: List<String>? = null
     ): String {
+        // Check if Nostr is enabled
+        if (!isEnabled) {
+            Log.d(TAG, "Nostr is disabled, skipping subscribe for id=$id")
+            return id
+        }
+        
         // Store subscription info for persistent tracking
         val subscriptionInfo = SubscriptionInfo(
             id = id,

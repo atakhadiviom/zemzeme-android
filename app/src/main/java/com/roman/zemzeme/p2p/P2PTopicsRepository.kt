@@ -3,10 +3,8 @@ package com.roman.zemzeme.p2p
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import com.roman.zemzeme.util.AppConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -15,10 +13,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Message received on a P2P topic (GossipSub)
@@ -46,7 +42,7 @@ data class TopicPeerUpdate(
 enum class TopicConnectionState {
     CONNECTING,    // Searching for peers
     CONNECTED,     // Has at least one peer
-    NO_PEERS,      // Legacy state (rendered as CONNECTING in UI)
+    NO_PEERS,      // Discovery complete, no peers found
     ERROR          // Connection error
 }
 
@@ -72,42 +68,25 @@ data class TopicInfo(
 
 /**
  * P2P Topics Repository
- *
+ * 
  * Manages P2P topic (GossipSub) subscriptions for:
  * - Geohash channels (location-based chat)
  * - Custom topic rooms
- *
+ * 
  * Delegates all P2P operations to P2PLibraryRepository.
  * Adapted from mobile_go_libp2p reference implementation.
- *
- * IMPORTANT: This is a singleton to prevent duplicate message collectors.
- * Multiple instances would each create their own collector on the shared
- * P2PLibraryRepository.incomingMessages flow, causing message duplication.
  */
-class P2PTopicsRepository private constructor(
-    private val p2pLibraryRepository: P2PLibraryRepository,
-    private val prefs: SharedPreferences
+class P2PTopicsRepository(
+    private val context: Context,
+    private val p2pLibraryRepository: P2PLibraryRepository
 ) {
     companion object {
         private const val TAG = "P2PTopicsRepository"
         private const val PREFS_NAME = "p2p_topics"
-
-        @Volatile
-        private var instance: P2PTopicsRepository? = null
-
-        fun getInstance(context: Context, p2pLibraryRepository: P2PLibraryRepository): P2PTopicsRepository {
-            return instance ?: synchronized(this) {
-                val appContext = context.applicationContext
-                val sharedPrefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                instance ?: P2PTopicsRepository(p2pLibraryRepository, sharedPrefs).also {
-                    instance = it
-                    Log.d(TAG, "P2PTopicsRepository singleton created")
-                }
-            }
-        }
     }
     
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     
     // State flows
     private val _subscribedTopics = MutableStateFlow<List<TopicInfo>>(emptyList())
@@ -121,14 +100,6 @@ class P2PTopicsRepository private constructor(
     
     private val _topicStates = MutableStateFlow<Map<String, TopicState>>(emptyMap())
     val topicStates: StateFlow<Map<String, TopicState>> = _topicStates.asStateFlow()
-    
-    // Per-topic refresh jobs - prevents orphaned coroutines when switching channels (memory leak fix)
-    private val refreshJobs = ConcurrentHashMap<String, Job>()
-    
-    // Presence tracking to prevent broadcast storms
-    private val lastPresenceBroadcast = mutableMapOf<String, Long>() // topic -> timestamp
-    private val respondedToPeers = mutableMapOf<String, Long>() // peerID -> timestamp
-    private val presenceLock = Any()
     
     // Event flows
     private val _incomingMessages = MutableSharedFlow<TopicMessage>(replay = 0, extraBufferCapacity = 100)
@@ -153,16 +124,6 @@ class P2PTopicsRepository private constructor(
                     )
                     addMessageToTopic(p2pMessage.topicName, topicMsg)
                     _incomingMessages.emit(topicMsg)
-                }
-            }
-        }
-        
-        // AUTO-STARTUP FIX: Watch for P2P node to become RUNNING and re-subscribe saved topics
-        scope.launch {
-            p2pLibraryRepository.nodeStatus.collect { status ->
-                if (status == P2PNodeStatus.RUNNING) {
-                    Log.d(TAG, "P2P node is RUNNING - auto-calling onNodeStarted()")
-                    onNodeStarted()
                 }
             }
         }
@@ -230,11 +191,7 @@ class P2PTopicsRepository private constructor(
             // Initialize message/peer tracking
             initTopicData(topicName)
             
-            // CRITICAL: Trigger DHT discovery for this topic
-            // This tells the Go library to actively search for other peers
-            p2pLibraryRepository.refreshTopicPeers(topicName)
-            
-            // Start peer discovery polling
+            // Start peer discovery
             startTopicDiscovery(topicName)
             
             Log.d(TAG, "Subscribed to topic: $topicName")
@@ -271,106 +228,7 @@ class P2PTopicsRepository private constructor(
     }
     
     /**
-     * Trigger full DHT discovery for a topic.
-     * This is the KEY function that finds and connects to peers!
-     * Call this when entering a topic chat or when user presses refresh.
-     */
-    suspend fun discoverTopicPeers(topicName: String) = withContext(Dispatchers.IO) {
-        try {
-            if (p2pLibraryRepository.nodeStatus.value != P2PNodeStatus.RUNNING) {
-                Log.w(TAG, "Cannot discover peers - node not running")
-                return@withContext
-            }
-            
-            // Set state to CONNECTING while discovering
-            val current = _topicStates.value.toMutableMap()
-            val state = current[topicName] ?: TopicState()
-            current[topicName] = state.copy(
-                connectionState = TopicConnectionState.CONNECTING,
-                lastUpdated = System.currentTimeMillis()
-            )
-            _topicStates.value = current
-            
-            Log.d(TAG, "Starting DHT discovery for topic: $topicName")
-            
-            // CRITICAL: Trigger Go-side DHT discovery (async, returns immediately)
-            p2pLibraryRepository.refreshTopicPeers(topicName)
-            
-            // Wait for discovery to start finding peers, then refresh UI
-            delay(AppConstants.P2P.DISCOVERY_INITIAL_DELAY_MS)
-            refreshTopicPeers(topicName)
-            
-            // Refresh again after more time for connections to establish
-            delay(AppConstants.P2P.DISCOVERY_SECONDARY_DELAY_MS)
-            refreshTopicPeers(topicName)
-            
-            // One more refresh after a longer delay for slow connections
-            delay(AppConstants.P2P.DISCOVERY_FINAL_DELAY_MS)
-            refreshTopicPeers(topicName)
-            
-            Log.d(TAG, "DHT discovery completed for topic: $topicName")
-        } catch (e: Exception) {
-            Log.e(TAG, "Discovery failed for $topicName: ${e.message}")
-            setTopicError(topicName, e.message ?: "Failed to discover peers")
-        }
-    }
-    
-    /**
-     * Start continuous peer refresh for an active topic.
-     * Call this when user enters a topic chat. Refreshes every 5 seconds.
-     * Critical for P2P connectivity: DHT takes time to propagate and connections may fail.
-     */
-    fun startContinuousRefresh(topicName: String) {
-        // Cancel any existing refresh job for this specific topic (prevents orphaned jobs)
-        refreshJobs[topicName]?.cancel()
-        
-        Log.d(TAG, "Starting continuous peer refresh for: $topicName")
-        
-        refreshJobs[topicName] = scope.launch {
-            try {
-                // Initial discovery trigger
-                p2pLibraryRepository.refreshTopicPeers(topicName)
-                
-                while (isActive) {
-                    delay(AppConstants.P2P.TOPIC_DISCOVERY_INTERVAL_MS)
-                    try {
-                        p2pLibraryRepository.refreshTopicPeers(topicName)
-                        refreshTopicPeers(topicName)
-                        
-                        val state = _topicStates.value[topicName]
-                        Log.d(TAG, "Continuous refresh for $topicName: ${state?.meshPeerCount ?: 0} mesh peers, ${state?.providerCount ?: 0} providers")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Continuous refresh error for $topicName: ${e.message}")
-                    }
-                }
-            } finally {
-                // Clean up when job completes or is cancelled
-                refreshJobs.remove(topicName)
-            }
-        }
-    }
-    
-    /**
-     * Stop continuous refresh for a topic or all topics.
-     * Call this when user leaves the topic chat.
-     * @param topicName If provided, stops refresh for that topic only. If null, stops all.
-     */
-    fun stopContinuousRefresh(topicName: String? = null) {
-        if (topicName != null) {
-            refreshJobs[topicName]?.cancel()
-            refreshJobs.remove(topicName)
-            Log.d(TAG, "Stopped continuous refresh for: $topicName")
-        } else {
-            val count = refreshJobs.size
-            refreshJobs.values.forEach { it.cancel() }
-            refreshJobs.clear()
-            Log.d(TAG, "Stopped all $count continuous refresh jobs")
-        }
-    }
-    
-    /**
      * Publish a message to a topic.
-     * Will ensure subscription exists before publishing.
      */
     suspend fun publishToTopic(
         topicName: String,
@@ -380,32 +238,6 @@ class P2PTopicsRepository private constructor(
         try {
             if (p2pLibraryRepository.nodeStatus.value != P2PNodeStatus.RUNNING) {
                 return@withContext Result.failure(Exception("P2P node not running"))
-            }
-            
-            // ALWAYS ensure we're subscribed on the Go side before publishing
-            // This is necessary because:
-            // 1. Topics may be loaded from SharedPreferences but not subscribed in Go
-            // 2. The Go subscription might have been lost
-            // subscribeTopic handles idempotency (will succeed if already subscribed)
-            Log.d(TAG, "Ensuring subscription for $topicName before publishing...")
-            val subResult = p2pLibraryRepository.subscribeTopic(topicName)
-            if (subResult.isFailure) {
-                return@withContext Result.failure(
-                    Exception("Failed to subscribe to $topicName: ${subResult.exceptionOrNull()?.message}")
-                )
-            }
-            
-            // CRITICAL: Trigger DHT discovery to find other peers on this topic!
-            // Without this, we can subscribe and publish but won't receive messages from others.
-            Log.d(TAG, "Triggering DHT discovery for $topicName...")
-            p2pLibraryRepository.refreshTopicPeers(topicName)
-            
-            // Also ensure we track it in Kotlin
-            val current = _subscribedTopics.value.toMutableList()
-            if (current.none { it.name == topicName }) {
-                current.add(TopicInfo(topicName))
-                _subscribedTopics.value = current
-                saveTopics()
             }
             
             val result = p2pLibraryRepository.publishToTopic(topicName, content)
@@ -445,77 +277,6 @@ class P2PTopicsRepository private constructor(
     fun getTopicState(topicName: String): TopicState {
         return _topicStates.value[topicName] ?: TopicState()
     }
-    
-    // ============== Presence Broadcasting ==============
-    
-    /**
-     * Broadcast our presence (nickname) to a topic.
-     * Used for: 1) Joining a topic, 2) Username changes, 3) Responding to new peers
-     * 
-     * @param topicName The topic to broadcast to
-     * @param nickname Our display name
-     * @param force If true, bypass cooldown (used for username changes)
-     */
-    suspend fun broadcastPresence(topicName: String, nickname: String, force: Boolean = false): Boolean {
-        val now = System.currentTimeMillis()
-        val shouldSkip = synchronized(presenceLock) {
-            val lastBroadcast = lastPresenceBroadcast[topicName] ?: 0L
-            !force && now - lastBroadcast < AppConstants.P2P.PRESENCE_BROADCAST_COOLDOWN_MS
-        }
-
-        // Enforce cooldown unless forced (username change)
-        if (shouldSkip) {
-            Log.d(TAG, "Presence broadcast skipped (cooldown): $topicName")
-            return false
-        }
-        
-        val peerID = p2pLibraryRepository.peerID.value ?: return false
-        
-        // Build lightweight presence message (~100 bytes)
-        val message = """{"type":"presence","nickname":"${nickname.replace("\"", "\\\"")}","peerID":"$peerID","timestamp":$now}"""
-        
-        return try {
-            publishToTopic(topicName, message, nickname)
-            synchronized(presenceLock) {
-                lastPresenceBroadcast[topicName] = now
-            }
-            Log.d(TAG, "Broadcast presence to $topicName: $nickname")
-            true
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to broadcast presence to $topicName: ${e.message}")
-            false
-        }
-    }
-    
-    /**
-     * Check if we should respond to a peer's presence message.
-     * Tracks responses to prevent infinite ping-pong loops in large groups.
-     * 
-     * @return true if we should respond with our own presence
-     */
-    fun shouldRespondToPresence(peerID: String): Boolean {
-        val now = System.currentTimeMillis()
-        synchronized(presenceLock) {
-            val lastResponse = respondedToPeers[peerID] ?: 0L
-
-            if (now - lastResponse < AppConstants.P2P.PRESENCE_RESPONSE_COOLDOWN_MS) {
-                return false // Already responded to this peer recently
-            }
-
-            respondedToPeers[peerID] = now
-
-            // Cleanup old entries (>5 minutes)
-            val cutoff = now - AppConstants.P2P.PRESENCE_CLEANUP_THRESHOLD_MS
-            respondedToPeers.entries.removeAll { it.value < cutoff }
-
-            return true
-        }
-    }
-    
-    /**
-     * Get our local peer ID for presence checks.
-     */
-    fun getMyPeerID(): String? = p2pLibraryRepository.peerID.value
     
     /**
      * Get messages for a topic.
@@ -584,8 +345,8 @@ class P2PTopicsRepository private constructor(
         
         val newState = when {
             peers.isNotEmpty() -> TopicConnectionState.CONNECTED
-            state.connectionState == TopicConnectionState.ERROR -> TopicConnectionState.ERROR
-            else -> TopicConnectionState.CONNECTING
+            state.connectionState == TopicConnectionState.CONNECTING -> TopicConnectionState.CONNECTING
+            else -> TopicConnectionState.NO_PEERS
         }
         
         current[topicName] = state.copy(
@@ -609,19 +370,24 @@ class P2PTopicsRepository private constructor(
     private fun startTopicDiscovery(topicName: String) {
         scope.launch {
             try {
-                // Periodically trigger discovery and check peers
-                repeat(AppConstants.P2P.TOPIC_DISCOVERY_ITERATIONS) { iteration ->
-                    delay(AppConstants.P2P.TOPIC_DISCOVERY_INTERVAL_MS)
-                    
-                    // Re-trigger DHT discovery every other iteration
-                    if (iteration % 2 == 0) {
-                        p2pLibraryRepository.refreshTopicPeers(topicName)
-                    }
-                    
-                    // Always refresh the peer list
+                // Periodically check peers
+                repeat(6) { // 30 seconds total
+                    delay(5000)
                     refreshTopicPeers(topicName)
                 }
                 
+                // Mark discovery complete
+                val current = _topicStates.value.toMutableMap()
+                val state = current[topicName]
+                if (state?.connectionState == TopicConnectionState.CONNECTING) {
+                    current[topicName] = state.copy(
+                        connectionState = if (state.meshPeerCount > 0) 
+                            TopicConnectionState.CONNECTED 
+                        else 
+                            TopicConnectionState.NO_PEERS
+                    )
+                    _topicStates.value = current
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "Topic discovery failed for $topicName: ${e.message}")
             }
@@ -630,55 +396,15 @@ class P2PTopicsRepository private constructor(
     
     private suspend fun refreshTopicPeers(topicName: String) {
         try {
-            // Get mesh peers (already connected, can exchange messages)
             val peers = p2pLibraryRepository.getTopicPeers(topicName)
-            
-            // Get topic stats (includes provider count from DHT)
-            val statsJson = p2pLibraryRepository.getTopicStats(topicName)
-            val providerCount = parseProviderCount(statsJson)
             
             val current = _topicPeers.value.toMutableMap()
             current[topicName] = peers
             _topicPeers.value = current
             
-            // Update state with both mesh peers and provider count
-            updateTopicStateWithStats(topicName, peers, providerCount)
-            
-            Log.d(TAG, "Topic $topicName: ${peers.size} mesh peers, $providerCount providers")
+            updateTopicState(topicName, peers)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to refresh peers for $topicName: ${e.message}")
-        }
-    }
-    
-    private fun updateTopicStateWithStats(topicName: String, peers: List<String>, providerCount: Int) {
-        val current = _topicStates.value.toMutableMap()
-        val state = current[topicName] ?: TopicState()
-        
-        val newConnectionState = when {
-            peers.isNotEmpty() -> TopicConnectionState.CONNECTED
-            state.connectionState == TopicConnectionState.ERROR -> TopicConnectionState.ERROR
-            else -> TopicConnectionState.CONNECTING
-        }
-        
-        Log.d(TAG, "TopicState update for $topicName: peers=${peers.size} providers=$providerCount state=${state.connectionState}->$newConnectionState")
-        
-        current[topicName] = state.copy(
-            connectionState = newConnectionState,
-            meshPeerCount = peers.size,
-            providerCount = providerCount,
-            peers = peers,
-            error = null,
-            lastUpdated = System.currentTimeMillis()
-        )
-        _topicStates.value = current
-    }
-    
-    private fun parseProviderCount(statsJson: String): Int {
-        return try {
-            val regex = """"providerCount":(\d+)""".toRegex()
-            regex.find(statsJson)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-        } catch (e: Exception) {
-            0
         }
     }
     

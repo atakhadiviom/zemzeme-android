@@ -222,6 +222,13 @@ class MainActivity : OrientationAwareActivity() {
                     onRetry = {
                         checkBluetoothAndProceed()
                     },
+                    onSkip = {
+                        // Disable BLE in config and proceed (for emulator testing)
+                        val p2pConfig = com.bitchat.android.p2p.P2PConfig(context)
+                        p2pConfig.bleEnabled = false
+                        Log.d("MainActivity", "BLE disabled via skip, proceeding without Bluetooth")
+                        checkLocationAndProceed()
+                    },
                     isLoading = isBluetoothLoading
                 )
             }
@@ -360,6 +367,15 @@ class MainActivity : OrientationAwareActivity() {
         if (permissionManager.isFirstTimeLaunch()) {
             Log.d("MainActivity", "First-time launch, skipping Bluetooth check - will check after permissions")
             proceedWithPermissionCheck()
+            return
+        }
+        
+        // Developer bypass: Skip Bluetooth check if BLE is disabled in transport config
+        // This allows testing P2P/Nostr on emulators without Bluetooth
+        val p2pConfig = com.bitchat.android.p2p.P2PConfig(this)
+        if (!p2pConfig.bleEnabled) {
+            Log.d("MainActivity", "BLE disabled in config, skipping Bluetooth check")
+            checkLocationAndProceed()
             return
         }
         
@@ -532,6 +548,7 @@ class MainActivity : OrientationAwareActivity() {
         Log.d("MainActivity", "Onboarding completed, checking Bluetooth and Location before initializing app")
         
         // After permissions are granted, re-check Bluetooth, Location, and Battery Optimization status
+        val p2pConfig = com.bitchat.android.p2p.P2PConfig(this)
         val currentBluetoothStatus = bluetoothStatusManager.checkBluetoothStatus()
         val currentLocationStatus = locationStatusManager.checkLocationStatus()
         val currentBatteryOptimizationStatus = when {
@@ -540,8 +557,11 @@ class MainActivity : OrientationAwareActivity() {
             else -> BatteryOptimizationStatus.ENABLED
         }
         
+        // Skip Bluetooth check if BLE is disabled in config (for emulator testing)
+        val bluetoothOk = !p2pConfig.bleEnabled || currentBluetoothStatus == BluetoothStatus.ENABLED
+        
         when {
-            currentBluetoothStatus != BluetoothStatus.ENABLED -> {
+            !bluetoothOk -> {
                 // Bluetooth still disabled, but now we have permissions to enable it
                 Log.d("MainActivity", "Permissions granted, but Bluetooth still disabled. Showing Bluetooth enable screen.")
                 mainViewModel.updateBluetoothStatus(currentBluetoothStatus)
@@ -563,8 +583,8 @@ class MainActivity : OrientationAwareActivity() {
                 mainViewModel.updateBatteryOptimizationLoading(false)
             }
             else -> {
-                // Both are enabled, proceed to app initialization
-                Log.d("MainActivity", "Both Bluetooth and Location services are enabled, proceeding to initialization")
+                // Both are enabled (or BLE bypassed), proceed to app initialization
+                Log.d("MainActivity", "Bluetooth/Location checks passed, proceeding to initialization")
                 mainViewModel.updateOnboardingState(OnboardingState.INITIALIZING)
                 initializeApp()
             }
@@ -723,13 +743,17 @@ class MainActivity : OrientationAwareActivity() {
             try { meshService.delegate = chatViewModel } catch (_: Exception) { }
 
             // Check if Bluetooth was disabled while app was backgrounded
-            val currentBluetoothStatus = bluetoothStatusManager.checkBluetoothStatus()
-            if (currentBluetoothStatus != BluetoothStatus.ENABLED) {
-                Log.w("MainActivity", "Bluetooth disabled while app was backgrounded")
-                mainViewModel.updateBluetoothStatus(currentBluetoothStatus)
-                mainViewModel.updateOnboardingState(OnboardingState.BLUETOOTH_CHECK)
-                mainViewModel.updateBluetoothLoading(false)
-                return
+            // Skip this check if BLE is disabled in config (for emulator testing)
+            val p2pConfig = com.bitchat.android.p2p.P2PConfig(this)
+            if (p2pConfig.bleEnabled) {
+                val currentBluetoothStatus = bluetoothStatusManager.checkBluetoothStatus()
+                if (currentBluetoothStatus != BluetoothStatus.ENABLED) {
+                    Log.w("MainActivity", "Bluetooth disabled while app was backgrounded")
+                    mainViewModel.updateBluetoothStatus(currentBluetoothStatus)
+                    mainViewModel.updateOnboardingState(OnboardingState.BLUETOOTH_CHECK)
+                    mainViewModel.updateBluetoothLoading(false)
+                    return
+                }
             }
             
             // Check if location services were disabled while app was backgrounded
