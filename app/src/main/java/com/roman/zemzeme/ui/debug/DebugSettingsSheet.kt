@@ -1,5 +1,9 @@
 package com.roman.zemzeme.ui.debug
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +19,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.SettingsEthernet
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -28,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.rotate
 import com.roman.zemzeme.mesh.BluetoothMeshService
 import com.roman.zemzeme.services.meshgraph.MeshGraphService
+import com.roman.zemzeme.update.UpdateManager
+import com.roman.zemzeme.update.UpdateState
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -197,6 +204,157 @@ fun DebugSettingsSheet(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
                             color = colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+
+            // Self-update section (Dev)
+            item {
+                val updateManager = remember { UpdateManager.getInstance(context) }
+                val updateState by updateManager.updateState.collectAsState()
+                
+                // Get current app version
+                val versionInfo = remember {
+                    try {
+                        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                        val versionName = pInfo.versionName ?: "?"
+                        val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            pInfo.longVersionCode
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pInfo.versionCode.toLong()
+                        }
+                        "$versionName (build $versionCode)"
+                    } catch (e: Exception) {
+                        "unknown"
+                    }
+                }
+                
+                Surface(shape = RoundedCornerShape(12.dp), color = colorScheme.surfaceVariant.copy(alpha = 0.2f)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = Color(0xFF5AC8FA))
+                            Text("self-update (dev)", fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        }
+                        
+                        // Current version display
+                        Text(
+                            "Current version: $versionInfo",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF5AC8FA)
+                        )
+                        
+                        Text(
+                            "Download and install updates from local dev server",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                        
+                        // Status display
+                        val statusText = when (val state = updateState) {
+                            is UpdateState.Idle -> "Ready"
+                            is UpdateState.Checking -> "Checking for updates..."
+                            is UpdateState.Available -> "Update available: ${state.info.versionName}"
+                            is UpdateState.Downloading -> "Downloading: ${(state.progress * 100).toInt()}%"
+                            is UpdateState.ReadyToInstall -> "Ready to install: ${state.info.versionName}"
+                            is UpdateState.Installing -> "Installing..."
+                            is UpdateState.Success -> "Update installed! Restart app."
+                            is UpdateState.PendingUserAction -> "Waiting for user confirmation..."
+                            is UpdateState.Error -> "Error: ${state.message}"
+                        }
+                        
+                        val statusColor = when (updateState) {
+                            is UpdateState.Idle -> colorScheme.onSurface.copy(alpha = 0.6f)
+                            is UpdateState.Checking -> Color(0xFF5AC8FA)
+                            is UpdateState.Available -> Color(0xFF5AC8FA)
+                            is UpdateState.Downloading, is UpdateState.Installing -> Color(0xFFFF9500)
+                            is UpdateState.ReadyToInstall -> Color(0xFF00C851)
+                            is UpdateState.Success -> Color(0xFF00C851)
+                            is UpdateState.PendingUserAction -> Color(0xFFFF9500)
+                            is UpdateState.Error -> Color(0xFFFF3B30)
+                        }
+                        
+                        Text(
+                            statusText,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            color = statusColor
+                        )
+                        
+                        // Progress bar when downloading
+                        if (updateState is UpdateState.Downloading) {
+                            val progress = (updateState as UpdateState.Downloading).progress
+                            if (progress >= 0) {
+                                LinearProgressIndicator(
+                                    progress = { progress },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color(0xFF5AC8FA),
+                                    trackColor = colorScheme.surfaceVariant
+                                )
+                            } else {
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color(0xFF5AC8FA),
+                                    trackColor = colorScheme.surfaceVariant
+                                )
+                            }
+                        }
+                        
+                        // Check for Updates button
+                        val canInstall = remember { updateManager.canRequestPackageInstalls() }
+                        val isIdle = updateState is UpdateState.Idle || updateState is UpdateState.Error || updateState is UpdateState.Success
+                        val isReadyToInstall = updateState is UpdateState.ReadyToInstall
+                        
+                        Button(
+                            onClick = {
+                                if (!updateManager.canRequestPackageInstalls()) {
+                                    // Send user to Settings to enable "Install unknown apps"
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        val intent = Intent(
+                                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                            Uri.parse("package:${context.packageName}")
+                                        )
+                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        context.startActivity(intent)
+                                    }
+                                } else if (isReadyToInstall) {
+                                    // Install the downloaded update
+                                    updateManager.installUpdate()
+                                } else {
+                                    // Reset state if needed and start update
+                                    if (updateState is UpdateState.Error || updateState is UpdateState.Success) {
+                                        updateManager.resetState()
+                                    }
+                                    updateManager.checkAndInstallUpdate()
+                                }
+                            },
+                            enabled = isIdle || isReadyToInstall,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isReadyToInstall) Color(0xFF00C851) else Color(0xFF5AC8FA),
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = when {
+                                    !updateManager.canRequestPackageInstalls() -> "Grant Install Permission"
+                                    isReadyToInstall -> "Install Update"
+                                    else -> "Check for Updates (Dev)"
+                                },
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        
+                        Text(
+                            "Server: http://10.0.2.2:8000",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            color = colorScheme.onSurface.copy(alpha = 0.5f)
                         )
                     }
                 }

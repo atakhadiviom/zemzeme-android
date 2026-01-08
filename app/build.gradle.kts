@@ -13,8 +13,8 @@ android {
         applicationId = "com.bitchat.droid"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 31
-        versionName = "1.7.0"
+        versionCode = 35
+        versionName = "1.7.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -131,7 +131,7 @@ dependencies {
     implementation(libs.okhttp)
 
     // Arti (Tor in Rust) Android bridge - custom build from latest source
-    // Built with rustls, 16KB page size support, and onio//un service client
+    // Built with rustls, 16KB page size support, and onion service client
     // Native libraries are in src/tor/jniLibs/ (extracted from arti-custom.aar)
     // Only included in tor flavor to reduce APK size for standard builds
     // Note: AAR is kept in libs/ for reference, but libraries loaded from jniLibs/
@@ -144,6 +144,9 @@ dependencies {
     
     // EXIF orientation handling for images
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+    
+    // P2P networking via Go libp2p (golib.aar built with gomobile)
+    implementation(files("libs/golib.aar"))
     
     // Testing
     testImplementation(libs.bundles.testing)

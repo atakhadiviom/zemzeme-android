@@ -23,9 +23,13 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roman.zemzeme.model.BitchatMessage
 import com.roman.zemzeme.ui.media.FullScreenImageViewer
+import com.roman.zemzeme.update.UpdateBanner
+import com.roman.zemzeme.update.UpdateManager
+import com.roman.zemzeme.update.UpdateReadyDialog
 
 /**
  * Main ChatScreen - REFACTORED to use component-based architecture
@@ -80,6 +84,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
         showPasswordDialog = showPasswordPrompt
     }
 
+    // Check for updates on app launch
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        val updateManager = UpdateManager.getInstance(context)
+        updateManager.checkForUpdate()
+    }
+
     val isConnected by viewModel.isConnected.collectAsStateWithLifecycle()
     val passwordPromptChannel by viewModel.passwordPromptChannel.collectAsStateWithLifecycle()
 
@@ -115,6 +126,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
     ) {
         val headerHeight = 42.dp
         
+        // Update ready dialog - pops up when download completes
+        UpdateReadyDialog()
+        
         // Main content area that responds to keyboard/window insets
         Column(
             modifier = Modifier
@@ -128,6 +142,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     .windowInsetsPadding(WindowInsets.statusBars)
                     .height(headerHeight)
             )
+
+            // Update banner - shows download progress / install prompt
+            UpdateBanner()
 
             // Messages area - takes up available space, will compress when keyboard appears
             MessagesList(

@@ -26,6 +26,7 @@ fun BluetoothCheckScreen(
     status: BluetoothStatus,
     onEnableBluetooth: () -> Unit,
     onRetry: () -> Unit,
+    onSkip: (() -> Unit)? = null,
     isLoading: Boolean = false
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -39,6 +40,7 @@ fun BluetoothCheckScreen(
                 BluetoothDisabledContent(
                     onEnableBluetooth = onEnableBluetooth,
                     onRetry = onRetry,
+                    onSkip = onSkip,
                     colorScheme = colorScheme,
                     isLoading = isLoading
                 )
@@ -61,6 +63,7 @@ fun BluetoothCheckScreen(
 private fun BluetoothDisabledContent(
     onEnableBluetooth: () -> Unit,
     onRetry: () -> Unit,
+    onSkip: (() -> Unit)?,
     colorScheme: ColorScheme,
     isLoading: Boolean
 ) {
@@ -139,6 +142,22 @@ private fun BluetoothDisabledContent(
                         ),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
+                }
+                
+                // Skip button for emulator testing
+                if (onSkip != null) {
+                    OutlinedButton(
+                        onClick = onSkip,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Continue Without Bluetooth",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = FontFamily.Monospace
+                            ),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
                 }
 
                 //Since we are automatically checking bluetooth state -- commented

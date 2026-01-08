@@ -32,6 +32,10 @@ class SecureIdentityStateManager(private val context: Context) {
         private const val KEY_CACHED_PEER_NOISE_KEYS = "cached_peer_noise_keys"
         private const val KEY_CACHED_NOISE_FINGERPRINTS = "cached_noise_fingerprints"
         private const val KEY_CACHED_FINGERPRINT_NICKNAMES = "cached_fingerprint_nicknames"
+        
+        // P2P libp2p identity keys
+        private const val KEY_P2P_PRIVATE_KEY = "p2p_private_key"
+        private const val KEY_P2P_PEER_ID = "p2p_peer_id"
     }
     
     private val prefs: SharedPreferences
@@ -423,5 +427,76 @@ class SecureIdentityStateManager(private val context: Context) {
             editor.remove(key)
         }
         editor.apply()
+    }
+    
+    // MARK: - P2P (libp2p) Identity Management
+    
+    /**
+     * Get P2P private key for libp2p.
+     * 
+     * Strategy: Use the Ed25519 signing key if available (derived identity),
+     * otherwise return stored P2P key or null.
+     * 
+     * @return Base64-encoded Ed25519 private key for libp2p, or null
+     */
+    fun getP2PPrivateKey(): String? {
+        // First try to get explicitly stored P2P key
+        val storedP2PKey = prefs.getString(KEY_P2P_PRIVATE_KEY, null)
+        if (storedP2PKey != null) {
+            return storedP2PKey
+        }
+        
+        // Fall back to deriving from signing key
+        val signingKey = loadSigningKey()
+        if (signingKey != null) {
+            val privateKeyBase64 = android.util.Base64.encodeToString(signingKey.first, android.util.Base64.NO_WRAP)
+            Log.d(TAG, "Deriving P2P key from signing key")
+            return privateKeyBase64
+        }
+        
+        // No keys available
+        return null
+    }
+    
+    /**
+     * Store a P2P private key explicitly.
+     * This allows using a separate identity for P2P if desired.
+     */
+    fun saveP2PPrivateKey(privateKeyBase64: String) {
+        prefs.edit().putString(KEY_P2P_PRIVATE_KEY, privateKeyBase64).apply()
+        Log.d(TAG, "Saved explicit P2P private key")
+    }
+    
+    /**
+     * Store the P2P Peer ID for reference (derived from key).
+     */
+    fun saveP2PPeerID(peerID: String) {
+        prefs.edit().putString(KEY_P2P_PEER_ID, peerID).apply()
+        Log.d(TAG, "Saved P2P Peer ID: ${peerID.take(20)}...")
+    }
+    
+    /**
+     * Get stored P2P Peer ID.
+     */
+    fun getP2PPeerID(): String? {
+        return prefs.getString(KEY_P2P_PEER_ID, null)
+    }
+    
+    /**
+     * Clear P2P identity (for identity reset).
+     */
+    fun clearP2PIdentity() {
+        prefs.edit()
+            .remove(KEY_P2P_PRIVATE_KEY)
+            .remove(KEY_P2P_PEER_ID)
+            .apply()
+        Log.d(TAG, "Cleared P2P identity")
+    }
+    
+    /**
+     * Check if P2P identity exists.
+     */
+    fun hasP2PIdentity(): Boolean {
+        return getP2PPrivateKey() != null
     }
 }

@@ -16,6 +16,8 @@ import com.roman.zemzeme.model.RequestSyncPacket
 import com.roman.zemzeme.sync.GossipSyncManager
 import com.roman.zemzeme.util.toHexString
 import com.roman.zemzeme.services.VerificationService
+import com.roman.zemzeme.p2p.P2PTransport
+import com.roman.zemzeme.p2p.P2PConfig
 import kotlinx.coroutines.*
 import java.util.*
 import kotlin.math.sign
@@ -55,6 +57,10 @@ class BluetoothMeshService(private val context: Context) {
     internal val connectionManager = BluetoothConnectionManager(context, myPeerID, fragmentManager) // Made internal for access
     private val packetProcessor = PacketProcessor(myPeerID)
     private lateinit var gossipSyncManager: GossipSyncManager
+    
+    // P2P Transport (libp2p) component
+    private val p2pTransport: P2PTransport by lazy { P2PTransport.getInstance(context) }
+    private val p2pConfig: P2PConfig by lazy { P2PConfig(context) }
     // Service-level notification manager for background (no-UI) DMs
     private val serviceNotificationManager = com.bitchat.android.ui.NotificationManager(
         context.applicationContext,
@@ -631,19 +637,64 @@ class BluetoothMeshService(private val context: Context) {
             return
         }
         
-        Log.i(TAG, "Starting Bluetooth mesh service with peer ID: $myPeerID")
+        Log.i(TAG, "Starting mesh service with peer ID: $myPeerID")
         
-        if (connectionManager.startServices()) {
-            isActive = true
-            
-            // Start periodic announcements for peer discovery and connectivity
-            sendPeriodicBroadcastAnnounce()
-            Log.d(TAG, "Started periodic broadcast announcements (every 30 seconds)")
-            // Start periodic syncs
-            gossipSyncManager.start()
-            Log.d(TAG, "GossipSyncManager started")
+        // Initialize Nostr enabled state from config
+        com.bitchat.android.nostr.NostrRelayManager.isEnabled = p2pConfig.nostrEnabled
+        Log.d(TAG, "Nostr enabled from config: ${p2pConfig.nostrEnabled}")
+        
+        // Try to start BLE services (may fail if BLE is disabled)
+        val bleStarted = if (p2pConfig.bleEnabled) {
+            val result = connectionManager.startServices()
+            if (result) {
+                Log.i(TAG, "✅ BLE services started successfully")
+                // Start periodic announcements for peer discovery and connectivity
+                sendPeriodicBroadcastAnnounce()
+                Log.d(TAG, "Started periodic broadcast announcements (every 30 seconds)")
+                // Start periodic syncs
+                gossipSyncManager.start()
+                Log.d(TAG, "GossipSyncManager started")
+            } else {
+                Log.w(TAG, "⚠️ BLE services failed to start (Bluetooth may be unavailable)")
+            }
+            result
         } else {
-            Log.e(TAG, "Failed to start Bluetooth services")
+            Log.i(TAG, "BLE is disabled in settings, skipping Bluetooth services")
+            false
+        }
+        
+        // Start P2P transport if enabled (independent of BLE)
+        if (p2pConfig.p2pEnabled && p2pConfig.autoStart) {
+            Log.i(TAG, "🚀 P2P transport enabled, starting...")
+            serviceScope.launch {
+                try {
+                    // Get P2P key from identity manager
+                    val identityManager = com.bitchat.android.identity.SecureIdentityStateManager(context)
+                    val p2pKey = identityManager.getP2PPrivateKey()
+                    Log.d(TAG, "P2P key obtained: ${if (p2pKey != null) "yes" else "generating new"}")
+                    
+                    p2pTransport.start(p2pKey).onSuccess {
+                        Log.i(TAG, "✅ P2P transport started with Peer ID: ${p2pTransport.getMyPeerID()}")
+                        // Save peer ID for reference
+                        p2pTransport.getMyPeerID()?.let { peerID ->
+                            identityManager.saveP2PPeerID(peerID)
+                        }
+                    }.onFailure { e ->
+                        Log.e(TAG, "❌ Failed to start P2P transport: ${e.message}")
+                        Log.e(TAG, "   P2P will be unavailable. Check logcat for P2PLibraryRepository errors.")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error starting P2P transport: ${e.message}", e)
+                }
+            }
+        } else {
+            Log.d(TAG, "P2P transport not starting: enabled=${p2pConfig.p2pEnabled}, autoStart=${p2pConfig.autoStart}")
+        }
+        
+        // Mark as active if any transport succeeded or is starting
+        isActive = bleStarted || p2pConfig.p2pEnabled
+        if (!isActive) {
+            Log.e(TAG, "❌ No transports started - mesh service inactive")
         }
     }
     
@@ -671,6 +722,15 @@ class BluetoothMeshService(private val context: Context) {
             Log.d(TAG, "GossipSyncManager stopped")
             connectionManager.stopServices()
             Log.d(TAG, "BluetoothConnectionManager stop requested")
+            
+            // Stop P2P transport
+            try {
+                p2pTransport.stop()
+                Log.d(TAG, "P2P transport stopped")
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping P2P transport: ${e.message}")
+            }
+            
             peerManager.shutdown()
             fragmentManager.shutdown()
             securityManager.shutdown()

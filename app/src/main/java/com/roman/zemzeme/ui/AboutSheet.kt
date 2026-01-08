@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +37,12 @@ import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
 import com.roman.zemzeme.net.TorMode
 import com.roman.zemzeme.net.TorPreferenceManager
 import com.roman.zemzeme.net.ArtiTorManager
+import com.roman.zemzeme.update.UpdateManager
+import com.roman.zemzeme.update.UpdateState
+import com.roman.zemzeme.p2p.P2PConfig
+import com.roman.zemzeme.p2p.P2PTransport
+import com.roman.zemzeme.p2p.P2PNodeStatus
+import kotlinx.coroutines.launch
 
 /**
  * Feature row for displaying app capabilities
@@ -241,6 +249,10 @@ fun AboutSheet(
                 ) {
                     // Header Section - App Identity
                     item(key = "header") {
+                        // Observe update state for subtle indicator
+                        val updateManager = remember { UpdateManager.getInstance(context) }
+                        val updateState by updateManager.updateState.collectAsState()
+                        
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -258,12 +270,78 @@ fun AboutSheet(
                                 ),
                                 color = colorScheme.onBackground
                             )
-                            Text(
-                                text = stringResource(R.string.version_prefix, versionName ?: ""),
-                                fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = colorScheme.onBackground.copy(alpha = 0.5f)
-                            )
+                            
+                            // Version with update status indicator
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.version_prefix, versionName ?: ""),
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = colorScheme.onBackground.copy(alpha = 0.5f)
+                                )
+                                
+                                // Subtle update status indicator
+                                when (updateState) {
+                                    is UpdateState.Downloading -> {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(12.dp),
+                                                strokeWidth = 1.5.dp,
+                                                color = Color(0xFFFF9500)
+                                            )
+                                            Text(
+                                                text = "updating...",
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = Color(0xFFFF9500)
+                                            )
+                                        }
+                                    }
+                                    is UpdateState.Installing -> {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(12.dp),
+                                                strokeWidth = 1.5.dp,
+                                                color = Color(0xFF5AC8FA)
+                                            )
+                                            Text(
+                                                text = "installing...",
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = Color(0xFF5AC8FA)
+                                            )
+                                        }
+                                    }
+                                    is UpdateState.PendingUserAction -> {
+                                        Text(
+                                            text = "tap to confirm",
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFFFF9500)
+                                        )
+                                    }
+                                    is UpdateState.Success -> {
+                                        Text(
+                                            text = "restart to apply",
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF00C851)
+                                        )
+                                    }
+                                    else -> {
+                                        // Idle or Error - no indicator shown
+                                    }
+                                }
+                            }
                             Text(
                                 text = stringResource(R.string.about_tagline),
                                 fontSize = 13.sp,
@@ -451,6 +529,128 @@ fun AboutSheet(
                                                 ) {}
                                             }
                                         } else null
+                                    )
+                                    
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 56.dp),
+                                        color = colorScheme.outline.copy(alpha = 0.12f)
+                                    )
+                                    
+                                    // P2P Network Toggle
+                                    val p2pConfig = remember { P2PConfig(context) }
+                                    var p2pEnabled by remember { mutableStateOf(p2pConfig.p2pEnabled) }
+                                    val p2pTransport = remember { P2PTransport.getInstance(context) }
+                                    val p2pStatus by p2pTransport.p2pRepository.nodeStatus.collectAsState()
+                                    val p2pScope = rememberCoroutineScope()
+                                    
+                                    SettingsToggleRow(
+                                        icon = Icons.Filled.Wifi,
+                                        title = "P2P Network",
+                                        subtitle = "Direct peer connections via libp2p",
+                                        checked = p2pEnabled,
+                                        onCheckedChange = { enabled ->
+                                            p2pEnabled = enabled
+                                            p2pConfig.p2pEnabled = enabled
+                                            
+                                            // Actually start/stop the P2P transport
+                                            p2pScope.launch {
+                                                if (enabled) {
+                                                    // P2PLibraryRepository manages its own keys
+                                                    p2pTransport.start().onSuccess {
+                                                        android.util.Log.i("AboutSheet", "✅ P2P started: ${p2pTransport.getMyPeerID()}")
+                                                    }.onFailure { e ->
+                                                        android.util.Log.e("AboutSheet", "❌ P2P start failed: ${e.message}")
+                                                    }
+                                                } else {
+                                                    p2pTransport.stop()
+                                                    android.util.Log.i("AboutSheet", "P2P stopped")
+                                                }
+                                            }
+                                        },
+                                        statusIndicator = if (p2pEnabled) {
+                                            {
+                                                val statusColor = when (p2pStatus) {
+                                                    P2PNodeStatus.RUNNING -> if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                                    P2PNodeStatus.STARTING -> Color(0xFFFF9500)
+                                                    else -> Color(0xFFFF3B30)
+                                                }
+                                                Surface(
+                                                    color = statusColor,
+                                                    shape = CircleShape,
+                                                    modifier = Modifier.size(8.dp)
+                                                ) {}
+                                            }
+                                        } else null
+                                    )
+                                    
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 56.dp),
+                                        color = colorScheme.outline.copy(alpha = 0.12f)
+                                    )
+                                    
+                                    // Nostr Network Toggle (for testing P2P in isolation)
+                                    var nostrEnabled by remember { mutableStateOf(p2pConfig.nostrEnabled) }
+                                    val nostrRelayManager = remember { com.bitchat.android.nostr.NostrRelayManager.getInstance(context) }
+                                    val nostrConnected by nostrRelayManager.isConnected.collectAsState()
+                                    
+                                    SettingsToggleRow(
+                                        icon = Icons.Filled.Cloud,
+                                        title = "Nostr Relays",
+                                        subtitle = "Internet relay messaging",
+                                        checked = nostrEnabled,
+                                        onCheckedChange = { enabled ->
+                                            nostrEnabled = enabled
+                                            p2pConfig.nostrEnabled = enabled
+                                            // Update static flag to prevent new connections
+                                            com.bitchat.android.nostr.NostrRelayManager.isEnabled = enabled
+                                            android.util.Log.i("AboutSheet", "Nostr toggle changed: enabled=$enabled, isEnabled=${com.bitchat.android.nostr.NostrRelayManager.isEnabled}")
+                                            // Disconnect/reconnect relays based on setting
+                                            if (!enabled) {
+                                                nostrRelayManager.disconnect()
+                                                android.widget.Toast.makeText(context, "Nostr disabled", android.widget.Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                nostrRelayManager.connect()
+                                                android.widget.Toast.makeText(context, "Nostr enabled", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        statusIndicator = if (nostrEnabled) {
+                                            {
+                                                val statusColor = if (nostrConnected) {
+                                                    if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                                } else {
+                                                    Color(0xFFFF9500)
+                                                }
+                                                Surface(
+                                                    color = statusColor,
+                                                    shape = CircleShape,
+                                                    modifier = Modifier.size(8.dp)
+                                                ) {}
+                                            }
+                                        } else null
+                                    )
+                                    
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 56.dp),
+                                        color = colorScheme.outline.copy(alpha = 0.12f)
+                                    )
+                                    
+                                    // BLE Mesh Toggle
+                                    var bleEnabled by remember { mutableStateOf(p2pConfig.bleEnabled) }
+                                    
+                                    SettingsToggleRow(
+                                        icon = Icons.Filled.Bluetooth,
+                                        title = "BLE Mesh",
+                                        subtitle = "Bluetooth proximity mesh",
+                                        checked = bleEnabled,
+                                        onCheckedChange = { enabled ->
+                                            bleEnabled = enabled
+                                            p2pConfig.bleEnabled = enabled
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                if (enabled) "BLE Mesh enabled (restart app to apply)" else "BLE Mesh disabled",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
                                     )
                                 }
                             }
