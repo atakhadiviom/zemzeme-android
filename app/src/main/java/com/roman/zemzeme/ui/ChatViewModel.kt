@@ -31,6 +31,7 @@ import com.roman.zemzeme.nostr.GeohashAliasRegistry
 import com.roman.zemzeme.util.dataFromHexString
 import com.roman.zemzeme.util.hexEncodedString
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Refactored ChatViewModel - Main coordinator for bitchat functionality
@@ -45,6 +46,7 @@ class ChatViewModel(
     var meshService: BluetoothMeshService = initialMeshService
         private set
     private val debugManager by lazy { try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
+    private val p2pMessageSequence = AtomicLong(0L)
 
     companion object {
         private const val TAG = "ChatViewModel"
@@ -312,12 +314,14 @@ class ChatViewModel(
                 if (incomingMessage.type == com.bitchat.android.p2p.P2PTransport.P2PMessageType.DIRECT_MESSAGE) {
                     // Route to private chat
                     val senderPeerID = "p2p:${incomingMessage.senderPeerID}"
+                    val normalizedTimestamp = normalizeP2PTimestamp(incomingMessage.timestamp)
+                    val messageId = buildP2PMessageId(incomingMessage.senderPeerID, normalizedTimestamp, incomingMessage.content)
                     val message = BitchatMessage(
-                        id = "p2p_${incomingMessage.senderPeerID}_${incomingMessage.timestamp}",
+                        id = messageId,
                         sender = com.bitchat.android.p2p.P2PAliasRegistry.getDisplayName(senderPeerID) 
                             ?: "p2p:${incomingMessage.senderPeerID.take(8)}…",
                         content = incomingMessage.content,
-                        timestamp = java.util.Date(incomingMessage.timestamp),
+                        timestamp = java.util.Date(normalizedTimestamp),
                         isRelay = false,
                         senderPeerID = senderPeerID
                     )
@@ -350,21 +354,22 @@ class ChatViewModel(
         // Broadcast presence change to P2P topic (if subscribed to geohash channel)
         val selectedChannel = state.selectedLocationChannel.value
         if (selectedChannel is com.bitchat.android.geohash.ChannelID.Location) {
-            val topicName = "geo:${selectedChannel.channel.geohash}"
-            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                try {
-                    val p2pTransport = com.bitchat.android.p2p.P2PTransport.getInstance(getApplication())
-                    val p2pTopicsRepository = com.bitchat.android.p2p.P2PTopicsRepository(
-                        getApplication(), p2pTransport.p2pRepository
-                    )
-                    // Force broadcast even if cooldown (username change is important)
-                    p2pTopicsRepository.broadcastPresence(topicName, newNickname, force = true)
-                    Log.d(TAG, "Broadcast P2P presence after username change: $newNickname")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to broadcast P2P presence on nickname change: ${e.message}")
-                }
-            }
+            geohashViewModel.broadcastP2PPresenceForCurrentChannel(newNickname, force = true)
         }
+    }
+
+    private fun normalizeP2PTimestamp(timestamp: Long): Long {
+        return when {
+            timestamp <= 0L -> System.currentTimeMillis()
+            timestamp < 10_000_000_000L -> timestamp * 1000
+            else -> timestamp
+        }
+    }
+
+    private fun buildP2PMessageId(peerID: String, timestamp: Long, content: String): String {
+        val contentHash = content.hashCode().toUInt().toString(16)
+        val sequence = p2pMessageSequence.incrementAndGet()
+        return "p2p_dm_${peerID}_${timestamp}_${contentHash}_$sequence"
     }
     
     /**

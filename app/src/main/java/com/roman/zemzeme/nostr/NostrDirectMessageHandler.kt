@@ -37,6 +37,7 @@ class NostrDirectMessageHandler(
     private val seen = HashSet<String>()
     private val max = 2000
 
+    @Synchronized
     private fun dedupe(id: String): Boolean {
         if (seen.contains(id)) return true
         seen.add(id)

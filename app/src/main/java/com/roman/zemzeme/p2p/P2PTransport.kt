@@ -219,7 +219,7 @@ class P2PTransport private constructor(
      * @param messageID Unique message ID
      * @return true if message was sent, false otherwise
      */
-    fun sendDirectMessage(
+    suspend fun sendDirectMessage(
         rawPeerID: String,
         content: String,
         senderNickname: String,
@@ -241,8 +241,8 @@ class P2PTransport private constructor(
                 timestamp = System.currentTimeMillis()
             )
             
-            // Use blocking call for synchronous result
-            kotlinx.coroutines.runBlocking {
+            // Use IO dispatcher for async network operations (prevents UI freeze)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 // First: try to connect to peer if not already connected
                 if (!p2pRepository.isConnected(rawPeerID)) {
                     Log.d(TAG, "Not connected to ${rawPeerID.take(12)}..., attempting connection via DHT...")

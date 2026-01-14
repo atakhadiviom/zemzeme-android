@@ -1,7 +1,6 @@
 package com.roman.zemzeme.nostr
 
 import android.app.Application
-import android.util.Log
 import com.roman.zemzeme.ui.ChatState
 import com.roman.zemzeme.ui.GeoPerson
 import com.roman.zemzeme.ui.TransportType
@@ -29,16 +28,21 @@ class GeohashRepository(
     // conversation key (e.g., "nostr_<pub16>") -> source geohash it belongs to
     private val conversationGeohash: MutableMap<String, String> = mutableMapOf()
 
+    private val lock = Any()
+
+    private inline fun <T> withLock(block: () -> T): T = synchronized(lock) { block() }
+
     fun setConversationGeohash(convKey: String, geohash: String) {
         if (geohash.isNotEmpty()) {
-            conversationGeohash[convKey] = geohash
+            withLock { conversationGeohash[convKey] = geohash }
         }
     }
 
-    fun getConversationGeohash(convKey: String): String? = conversationGeohash[convKey]
+    fun getConversationGeohash(convKey: String): String? = withLock { conversationGeohash[convKey] }
 
     fun findPubkeyByNickname(targetNickname: String): String? {
-        return geoNicknames.entries.firstOrNull { (_, nickname) ->
+        val entries = withLock { geoNicknames.entries.toList() }
+        return entries.firstOrNull { (_, nickname) ->
             val base = nickname.split("#").firstOrNull() ?: nickname
             base == targetNickname
         }?.key
@@ -50,31 +54,37 @@ class GeohashRepository(
     // Current geohash in view
     private var currentGeohash: String? = null
 
-    fun setCurrentGeohash(geo: String?) { currentGeohash = geo }
-    fun getCurrentGeohash(): String? = currentGeohash
+    fun setCurrentGeohash(geo: String?) { withLock { currentGeohash = geo } }
+    fun getCurrentGeohash(): String? = withLock { currentGeohash }
 
     fun clearAll() {
-        geohashParticipants.clear()
-        geoNicknames.clear()
-        nostrKeyMapping.clear()
+        withLock {
+            geohashParticipants.clear()
+            geoNicknames.clear()
+            nostrKeyMapping.clear()
+            conversationGeohash.clear()
+            currentGeohash = null
+        }
         state.setGeohashPeople(emptyList())
         state.setTeleportedGeo(emptySet())
         state.setGeohashParticipantCounts(emptyMap())
-        currentGeohash = null
     }
 
     fun cacheNickname(pubkeyHex: String, nickname: String) {
-        val lower = pubkeyHex.lowercase()
-        val previous = geoNicknames[lower]
-        geoNicknames[lower] = nickname
-        if (previous != nickname && currentGeohash != null) {
+        val shouldRefresh = withLock {
+            val lower = pubkeyHex.lowercase()
+            val previous = geoNicknames[lower]
+            geoNicknames[lower] = nickname
+            previous != nickname && currentGeohash != null
+        }
+        if (shouldRefresh) {
             refreshGeohashPeople()
         }
     }
 
-    fun getCachedNickname(pubkeyHex: String): String? = geoNicknames[pubkeyHex.lowercase()]
+    fun getCachedNickname(pubkeyHex: String): String? = withLock { geoNicknames[pubkeyHex.lowercase()] }
 
-    fun getAllNicknames(): Map<String, String> = geoNicknames.toMap()
+    fun getAllNicknames(): Map<String, String> = withLock { geoNicknames.toMap() }
 
     fun markTeleported(pubkeyHex: String) {
         val set = state.getTeleportedGeoValue().toMutableSet()
@@ -91,43 +101,55 @@ class GeohashRepository(
     }
 
     fun updateParticipant(geohash: String, participantId: String, lastSeen: Date) {
-        val participants = geohashParticipants.getOrPut(geohash) { mutableMapOf() }
-        participants[participantId] = lastSeen
-        if (currentGeohash == geohash) refreshGeohashPeople()
+        val shouldRefresh = withLock {
+            val participants = geohashParticipants.getOrPut(geohash) { mutableMapOf() }
+            participants[participantId] = lastSeen
+            currentGeohash == geohash
+        }
+        if (shouldRefresh) {
+            refreshGeohashPeople()
+        }
         updateReactiveParticipantCounts()
     }
 
     fun geohashParticipantCount(geohash: String): Int {
         val cutoff = Date(System.currentTimeMillis() - 5 * 60 * 1000)
-        val participants = geohashParticipants[geohash] ?: return 0
-        // prune expired
-        val it = participants.iterator()
-        while (it.hasNext()) {
-            val e = it.next()
-            if (e.value.before(cutoff)) it.remove()
+        val keys = withLock {
+            val participants = geohashParticipants[geohash] ?: return@withLock emptyList<String>()
+            val it = participants.iterator()
+            while (it.hasNext()) {
+                val e = it.next()
+                if (e.value.before(cutoff)) it.remove()
+            }
+            participants.keys.toList()
         }
-        // exclude blocked users
-        return participants.keys.count { !dataManager.isGeohashUserBlocked(it) }
+        if (keys.isEmpty()) return 0
+        return keys.count { !dataManager.isGeohashUserBlocked(it) }
     }
 
     fun refreshGeohashPeople() {
-        val geohash = currentGeohash
+        val geohash = withLock { currentGeohash }
         if (geohash == null) {
             // Use postValue for thread safety - this can be called from background threads
             state.setGeohashPeople(emptyList())
             return
         }
         val cutoff = Date(System.currentTimeMillis() - 5 * 60 * 1000)
-        val participants = geohashParticipants[geohash] ?: mutableMapOf()
-        // prune expired
-        val it = participants.iterator()
-        while (it.hasNext()) {
-            val e = it.next()
-            if (e.value.before(cutoff)) it.remove()
+        val (participantsSnapshot, nicknamesSnapshot) = withLock {
+            val participants = geohashParticipants.getOrPut(geohash) { mutableMapOf() }
+            val it = participants.iterator()
+            while (it.hasNext()) {
+                val e = it.next()
+                if (e.value.before(cutoff)) it.remove()
+            }
+            participants.toMap() to geoNicknames.toMap()
         }
-        geohashParticipants[geohash] = participants
+        val myHex = try {
+            NostrIdentityBridge.deriveIdentity(geohash, application).publicKeyHex
+        } catch (_: Exception) { null }
+        val myNickname = state.getNicknameValue() ?: "anon"
         // exclude blocked users from people list
-        val people = participants.filterKeys { !dataManager.isGeohashUserBlocked(it) }
+        val people = participantsSnapshot.filterKeys { !dataManager.isGeohashUserBlocked(it) }
             .map { (pubkeyHex, lastSeen) ->
             // Detect transport type: P2P participants have "p2p:" prefix
             val isP2P = pubkeyHex.startsWith("p2p:")
@@ -135,27 +157,15 @@ class GeohashRepository(
             
             // Use our actual nickname for self; otherwise use cached nickname
             // For P2P peers without a cached nickname, generate a friendly "anon" name
-            val base = try {
-                val myHex = currentGeohash?.let { NostrIdentityBridge.deriveIdentity(it, application).publicKeyHex }
-                if (myHex != null && myHex.equals(pubkeyHex, true)) {
-                    state.getNicknameValue() ?: "anon"
-                } else {
-                    val cached = getCachedNickname(pubkeyHex)
-                    if (cached != null) {
-                        cached
-                    } else if (isP2P) {
-                        // Generate friendly anon name from P2P peer ID suffix
-                        val peerIdPart = pubkeyHex.removePrefix("p2p:")
-                        "anon${peerIdPart.takeLast(4)}"
-                    } else {
-                        "anon"
-                    }
+            val cached = nicknamesSnapshot[pubkeyHex.lowercase()]
+            val base = when {
+                myHex != null && myHex.equals(pubkeyHex, true) -> myNickname
+                cached != null -> cached
+                isP2P -> {
+                    val peerIdPart = pubkeyHex.removePrefix("p2p:")
+                    "anon${peerIdPart.takeLast(4)}"
                 }
-            } catch (_: Exception) { 
-                val cached = getCachedNickname(pubkeyHex)
-                if (cached != null) cached 
-                else if (isP2P) "anon${pubkeyHex.takeLast(4)}" 
-                else "anon" 
+                else -> "anon"
             }
             GeoPerson(
                 id = if (isP2P) pubkeyHex else pubkeyHex.lowercase(),
@@ -170,8 +180,9 @@ class GeohashRepository(
 
     fun updateReactiveParticipantCounts() {
         val cutoff = Date(System.currentTimeMillis() - 5 * 60 * 1000)
+        val snapshot = withLock { geohashParticipants.mapValues { it.value.toMap() } }
         val counts = mutableMapOf<String, Int>()
-        for ((gh, participants) in geohashParticipants) {
+        for ((gh, participants) in snapshot) {
             val active = participants.filterKeys { !dataManager.isGeohashUserBlocked(it) }
                 .values.count { !it.before(cutoff) }
             counts[gh] = active
@@ -181,16 +192,16 @@ class GeohashRepository(
     }
 
     fun putNostrKeyMapping(tempKeyOrPeer: String, pubkeyHex: String) {
-        nostrKeyMapping[tempKeyOrPeer] = pubkeyHex
+        withLock { nostrKeyMapping[tempKeyOrPeer] = pubkeyHex }
     }
 
-    fun getNostrKeyMapping(): Map<String, String> = nostrKeyMapping.toMap()
+    fun getNostrKeyMapping(): Map<String, String> = withLock { nostrKeyMapping.toMap() }
 
     fun displayNameForNostrPubkey(pubkeyHex: String): String {
         val suffix = pubkeyHex.takeLast(4)
         val lower = pubkeyHex.lowercase()
         // Self nickname if matches current identity of current geohash
-        val current = currentGeohash
+        val current = withLock { currentGeohash }
         if (current != null) {
             try {
                 val my = NostrIdentityBridge.deriveIdentity(current, application)
@@ -199,34 +210,38 @@ class GeohashRepository(
                 }
             } catch (_: Exception) {}
         }
-        val nick = geoNicknames[lower] ?: "anon"
+        val nick = withLock { geoNicknames[lower] } ?: "anon"
         return "$nick#$suffix"
     }
 
     fun displayNameForNostrPubkeyUI(pubkeyHex: String): String {
         val lower = pubkeyHex.lowercase()
         val suffix = pubkeyHex.takeLast(4)
-        val current = currentGeohash
+        val current = withLock { currentGeohash }
+        val (participantsSnapshot, nicknamesSnapshot) = withLock {
+            val participants = if (current != null) geohashParticipants[current]?.toMap() ?: emptyMap() else emptyMap()
+            val nicknames = geoNicknames.toMap()
+            participants to nicknames
+        }
         val base: String = try {
             if (current != null) {
                 val my = NostrIdentityBridge.deriveIdentity(current, application)
                 if (my.publicKeyHex.equals(lower, true)) {
                     state.getNicknameValue() ?: "anon"
-                } else geoNicknames[lower] ?: "anon"
-            } else geoNicknames[lower] ?: "anon"
-        } catch (_: Exception) { geoNicknames[lower] ?: "anon" }
+                } else nicknamesSnapshot[lower] ?: "anon"
+            } else nicknamesSnapshot[lower] ?: "anon"
+        } catch (_: Exception) { nicknamesSnapshot[lower] ?: "anon" }
         if (current == null) return base
         return try {
             val cutoff = Date(System.currentTimeMillis() - 5 * 60 * 1000)
-            val participants = geohashParticipants[current] ?: emptyMap()
             var count = 0
-            for ((k, t) in participants) {
+            for ((k, t) in participantsSnapshot) {
                 if (dataManager.isGeohashUserBlocked(k)) continue
                 if (t.before(cutoff)) continue
-                val name = if (k.equals(lower, true)) base else (geoNicknames[k.lowercase()] ?: "anon")
+                val name = if (k.equals(lower, true)) base else (nicknamesSnapshot[k.lowercase()] ?: "anon")
                 if (name.equals(base, true)) { count++; if (count > 1) break }
             }
-            if (!participants.containsKey(lower)) count += 1
+            if (!participantsSnapshot.containsKey(lower)) count += 1
             if (count > 1) "$base#$suffix" else base
         } catch (_: Exception) { base }
     }
@@ -237,18 +252,22 @@ class GeohashRepository(
     fun displayNameForGeohashConversation(pubkeyHex: String, sourceGeohash: String): String {
         val lower = pubkeyHex.lowercase()
         val suffix = pubkeyHex.takeLast(4)
-        val base = geoNicknames[lower] ?: "anon"
+        val (participantsSnapshot, nicknamesSnapshot) = withLock {
+            val participants = geohashParticipants[sourceGeohash]?.toMap() ?: emptyMap()
+            val nicknames = geoNicknames.toMap()
+            participants to nicknames
+        }
+        val base = nicknamesSnapshot[lower] ?: "anon"
         return try {
             val cutoff = Date(System.currentTimeMillis() - 5 * 60 * 1000)
-            val participants = geohashParticipants[sourceGeohash] ?: emptyMap()
             var count = 0
-            for ((k, t) in participants) {
+            for ((k, t) in participantsSnapshot) {
                 if (dataManager.isGeohashUserBlocked(k)) continue
                 if (t.before(cutoff)) continue
-                val name = if (k.equals(lower, true)) base else (geoNicknames[k.lowercase()] ?: "anon")
+                val name = if (k.equals(lower, true)) base else (nicknamesSnapshot[k.lowercase()] ?: "anon")
                 if (name.equals(base, true)) { count++; if (count > 1) break }
             }
-            if (!participants.containsKey(lower)) count += 1
+            if (!participantsSnapshot.containsKey(lower)) count += 1
             if (count > 1) "$base#$suffix" else base
         } catch (_: Exception) { base }
     }
