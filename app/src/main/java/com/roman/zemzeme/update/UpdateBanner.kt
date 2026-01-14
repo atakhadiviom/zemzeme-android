@@ -75,7 +75,8 @@ fun UpdateBanner(
             state = updateState,
             onInstall = { updateManager.installUpdate() },
             onDismiss = { updateManager.dismissUpdate() },
-            onRetry = { updateManager.checkForUpdate() }
+            onRetry = { updateManager.checkForUpdate() },
+            onCancel = { updateManager.cancelDownload() }
         )
     }
 }
@@ -85,7 +86,8 @@ private fun UpdateBannerContent(
     state: UpdateState,
     onInstall: () -> Unit,
     onDismiss: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onCancel: () -> Unit
 ) {
     val backgroundColor = when (state) {
         is UpdateState.Error -> MaterialTheme.colorScheme.errorContainer
@@ -109,7 +111,8 @@ private fun UpdateBannerContent(
                 DownloadingBanner(
                     progress = state.progress,
                     versionName = state.info.versionName,
-                    contentColor = contentColor
+                    contentColor = contentColor,
+                    onCancel = onCancel
                 )
             }
             
@@ -144,7 +147,8 @@ private fun UpdateBannerContent(
 private fun DownloadingBanner(
     progress: Float,
     versionName: String,
-    contentColor: androidx.compose.ui.graphics.Color
+    contentColor: androidx.compose.ui.graphics.Color,
+    onCancel: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -173,6 +177,18 @@ private fun DownloadingBanner(
                     text = "${(progress * 100).toInt()}%",
                     style = MaterialTheme.typography.bodySmall,
                     color = contentColor.copy(alpha = 0.7f)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = onCancel,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cancel download",
+                    tint = contentColor.copy(alpha = 0.7f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

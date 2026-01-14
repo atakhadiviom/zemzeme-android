@@ -13,8 +13,8 @@ android {
         applicationId = "com.bitchat.droid"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 35
-        versionName = "1.7.3"
+        versionCode = 31
+        versionName = "1.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -147,6 +147,9 @@ dependencies {
     
     // P2P networking via Go libp2p (golib.aar built with gomobile)
     implementation(files("libs/golib.aar"))
+    
+    // Play Core for In-App Updates (primary update source)
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
     
     // Testing
     testImplementation(libs.bundles.testing)

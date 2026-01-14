@@ -147,4 +147,25 @@ object AppConstants {
         const val PRESENCE_RESPONSE_COOLDOWN_MS: Long = 30_000L
         const val PRESENCE_CLEANUP_THRESHOLD_MS: Long = 300_000L // 5 minutes
     }
+
+    object Update {
+        // Timing
+        const val CHECK_INTERVAL_MS = 3_600_000L          // 1 hour
+        const val MIN_CHECK_INTERVAL_MS = 300_000L        // 5 minutes
+        const val CONNECT_TIMEOUT_SECONDS = 30L
+        const val READ_TIMEOUT_SECONDS = 300L             // 5 min for large APK
+        const val WRITE_TIMEOUT_SECONDS = 60L
+
+        // GitHub Releases API (official BitChat repo)
+        const val GITHUB_OWNER = "permissionlesstech"
+        const val GITHUB_REPO = "bitchat-android"
+        const val GITHUB_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+
+        // APK naming patterns for architecture detection
+        const val APK_ARM64_PATTERN = "arm64-v8a"
+        const val APK_ARMV7_PATTERN = "armeabi-v7a"
+        const val APK_X86_PATTERN = "x86-release"
+        const val APK_X86_64_PATTERN = "x86_64"
+        const val APK_UNIVERSAL_PATTERN = "universal"
+    }
 }
