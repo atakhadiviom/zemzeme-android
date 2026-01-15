@@ -111,6 +111,7 @@ class P2PTopicsRepository(
     // Presence tracking to prevent broadcast storms
     private val lastPresenceBroadcast = mutableMapOf<String, Long>() // topic -> timestamp
     private val respondedToPeers = mutableMapOf<String, Long>() // peerID -> timestamp
+    private val presenceLock = Any()
     
     // Event flows
     private val _incomingMessages = MutableSharedFlow<TopicMessage>(replay = 0, extraBufferCapacity = 100)
@@ -440,10 +441,13 @@ class P2PTopicsRepository(
      */
     suspend fun broadcastPresence(topicName: String, nickname: String, force: Boolean = false): Boolean {
         val now = System.currentTimeMillis()
-        val lastBroadcast = lastPresenceBroadcast[topicName] ?: 0L
-        
+        val shouldSkip = synchronized(presenceLock) {
+            val lastBroadcast = lastPresenceBroadcast[topicName] ?: 0L
+            !force && now - lastBroadcast < AppConstants.P2P.PRESENCE_BROADCAST_COOLDOWN_MS
+        }
+
         // Enforce cooldown unless forced (username change)
-        if (!force && now - lastBroadcast < AppConstants.P2P.PRESENCE_BROADCAST_COOLDOWN_MS) {
+        if (shouldSkip) {
             Log.d(TAG, "Presence broadcast skipped (cooldown): $topicName")
             return false
         }
@@ -455,7 +459,9 @@ class P2PTopicsRepository(
         
         return try {
             publishToTopic(topicName, message, nickname)
-            lastPresenceBroadcast[topicName] = now
+            synchronized(presenceLock) {
+                lastPresenceBroadcast[topicName] = now
+            }
             Log.d(TAG, "Broadcast presence to $topicName: $nickname")
             true
         } catch (e: Exception) {
@@ -472,19 +478,21 @@ class P2PTopicsRepository(
      */
     fun shouldRespondToPresence(peerID: String): Boolean {
         val now = System.currentTimeMillis()
-        val lastResponse = respondedToPeers[peerID] ?: 0L
-        
-        if (now - lastResponse < AppConstants.P2P.PRESENCE_RESPONSE_COOLDOWN_MS) {
-            return false // Already responded to this peer recently
+        synchronized(presenceLock) {
+            val lastResponse = respondedToPeers[peerID] ?: 0L
+
+            if (now - lastResponse < AppConstants.P2P.PRESENCE_RESPONSE_COOLDOWN_MS) {
+                return false // Already responded to this peer recently
+            }
+
+            respondedToPeers[peerID] = now
+
+            // Cleanup old entries (>5 minutes)
+            val cutoff = now - AppConstants.P2P.PRESENCE_CLEANUP_THRESHOLD_MS
+            respondedToPeers.entries.removeAll { it.value < cutoff }
+
+            return true
         }
-        
-        respondedToPeers[peerID] = now
-        
-        // Cleanup old entries (>5 minutes)
-        val cutoff = now - AppConstants.P2P.PRESENCE_CLEANUP_THRESHOLD_MS
-        respondedToPeers.entries.removeAll { it.value < cutoff }
-        
-        return true
     }
     
     /**

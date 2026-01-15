@@ -5,6 +5,10 @@ import android.util.Log
 import com.roman.zemzeme.mesh.BluetoothMeshService
 import com.roman.zemzeme.model.ReadReceipt
 import com.roman.zemzeme.nostr.NostrTransport
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Routes messages between BLE mesh and Nostr transports, matching iOS behavior.
@@ -40,6 +44,9 @@ class MessageRouter private constructor(
 
     // Outbox: peerID -> queued (content, nickname, messageID)
     private val outbox = mutableMapOf<String, MutableList<Triple<String, String, String>>>()
+    private val outboxLock = Any()
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Listener for favorites changes to flush outbox when npub mapping appears/changes
     private val favoriteListener = object: com.bitchat.android.favorites.FavoritesChangeListener {
@@ -60,14 +67,17 @@ class MessageRouter private constructor(
         if (toPeerID.startsWith("p2p:")) {
             val rawPeerId = toPeerID.removePrefix("p2p:")
             Log.d(TAG, "Routing PM via P2P direct to ${rawPeerId.take(12)}… id=${messageID.take(8)}…")
-            try {
-                val p2pTransport = com.bitchat.android.p2p.P2PTransport.getInstance(context)
-                val success = p2pTransport.sendDirectMessage(rawPeerId, content, recipientNickname, messageID)
-                if (!success) {
-                    Log.w(TAG, "P2P direct message send failed for ${rawPeerId.take(12)}…")
+            // Launch coroutine for async P2P send (sendDirectMessage is suspend fun)
+            scope.launch {
+                try {
+                    val p2pTransport = com.bitchat.android.p2p.P2PTransport.getInstance(context)
+                    val success = p2pTransport.sendDirectMessage(rawPeerId, content, recipientNickname, messageID)
+                    if (!success) {
+                        Log.w(TAG, "P2P direct message send failed for ${rawPeerId.take(12)}…")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "P2P direct message error: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "P2P direct message error: ${e.message}")
             }
             return
         }
@@ -96,8 +106,10 @@ class MessageRouter private constructor(
             nostr.sendPrivateMessage(content, toPeerID, recipientNickname, messageID)
         } else {
             Log.d(TAG, "Queued PM for ${toPeerID} (no mesh, no Nostr mapping) msg_id=${messageID.take(8)}…")
-            val q = outbox.getOrPut(toPeerID) { mutableListOf() }
-            q.add(Triple(content, recipientNickname, messageID))
+            synchronized(outboxLock) {
+                val q = outbox.getOrPut(toPeerID) { mutableListOf() }
+                q.add(Triple(content, recipientNickname, messageID))
+            }
             Log.d(TAG, "Initiating noise handshake after queueing PM for ${toPeerID.take(8)}…")
             mesh.initiateNoiseHandshake(toPeerID)
         }
@@ -141,39 +153,45 @@ class MessageRouter private constructor(
 
     // Flush any queued messages for a specific peerID
     fun flushOutboxFor(peerID: String) {
-        val queued = outbox[peerID] ?: return
+        val queued = synchronized(outboxLock) { outbox[peerID]?.toMutableList() ?: return }
         if (queued.isEmpty()) return
         Log.d(TAG, "Flushing outbox for ${peerID.take(8)}… count=${queued.size}")
-        val iterator = queued.iterator()
-        while (iterator.hasNext()) {
-            val (content, nickname, messageID) = iterator.next()
+        val sentItems = mutableListOf<Triple<String, String, String>>()
+        for ((content, nickname, messageID) in queued) {
             var hasMesh = mesh.getPeerInfo(peerID)?.isConnected == true && mesh.hasEstablishedSession(peerID)
             // If this is a noiseHex key, see if there is a connected mesh peer for this identity
             if (!hasMesh && peerID.length == 64 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
                 val meshPeer = resolveMeshPeerForNoiseHex(peerID)
                 if (meshPeer != null && mesh.getPeerInfo(meshPeer)?.isConnected == true && mesh.hasEstablishedSession(meshPeer)) {
                     mesh.sendPrivateMessage(content, meshPeer, nickname, messageID)
-                    iterator.remove()
+                    sentItems.add(Triple(content, nickname, messageID))
                     continue
                 }
             }
             val canNostr = canSendViaNostr(peerID)
             if (hasMesh) {
                 mesh.sendPrivateMessage(content, peerID, nickname, messageID)
-                iterator.remove()
+                sentItems.add(Triple(content, nickname, messageID))
             } else if (canNostr) {
                 nostr.sendPrivateMessage(content, peerID, nickname, messageID)
-                iterator.remove()
+                sentItems.add(Triple(content, nickname, messageID))
             }
         }
-        if (queued.isEmpty()) {
-            outbox.remove(peerID)
+        if (sentItems.isNotEmpty()) {
+            synchronized(outboxLock) {
+                val current = outbox[peerID] ?: return
+                current.removeAll(sentItems)
+                if (current.isEmpty()) {
+                    outbox.remove(peerID)
+                }
+            }
         }
     }
 
     // Flush everything (rarely used)
     fun flushAllOutbox() {
-        outbox.keys.toList().forEach { flushOutboxFor(it) }
+        val keys = synchronized(outboxLock) { outbox.keys.toList() }
+        keys.forEach { flushOutboxFor(it) }
     }
 
     private fun canSendViaNostr(peerID: String): Boolean {
