@@ -1,0 +1,199 @@
+# P2P Connection Issues - Debug Session 2026-02-06
+
+## Issue 1: P2P Disabled in Settings
+
+**Indication:**
+- Device only using Bluetooth mesh, not P2P
+- No GoLog entries at all in logcat
+- Device receiving BLE mesh packets but not P2P messages
+
+**Logs:**
+```
+D BluetoothMeshService: P2P transport not starting: enabled=false, autoStart=true
+```
+
+**Problem:**
+P2P was disabled in app settings. The previous app process (PID 17123) had P2P enabled, but the current process (PID 3174) had it disabled.
+
+**Solution:**
+Enable P2P in app settings, or restart the app (which re-read settings correctly).
+
+---
+
+## Issue 2: P2P Connection Loss - Zero Peers, Cannot Recover
+
+**Indication:**
+- Device shows "connected" state but cannot send/receive P2P messages
+- UI may show stale peer counts (e.g., "11 mesh peers, 12 providers") but actual connections are dead
+
+**Logs:**
+```
+I GoLog: === DHT DISCOVERY for topic bcd ===
+I GoLog:   DHT routing table size: 0
+I GoLog:   Connected peers: 0
+I GoLog: Found 0 providers in this query, 12 total known providers for topic bcd
+I GoLog: No providers found for topic bcd
+E GoLog: ERROR basichost basic/basic_host.go:396 failed to resolve local interface addresses {"error": "route ip+net: netlinkrib: permission denied"}
+```
+
+**Problem:**
+The P2P node loses all connections and cannot recover automatically. The DHT routing table becomes empty (0 peers), and despite having cached "known providers", it cannot find or connect to any of them. The `netlinkrib: permission denied` error indicates the Go code cannot query network interfaces, but this alone doesn't cause the issue - it's a symptom of a deeper connection management problem.
+
+**Solution:**
+Force restart the app (`am force-stop` + `am start`). After restart, the node successfully bootstraps:
+```
+I GoLog: DHT re-bootstrap completed, routing table: 84 peers
+I GoLog: Peer connected: 12D3KooWKfwM via quic-v1
+```
+
+**Root Cause (needs code fix):**
+The P2P node lacks automatic reconnection/re-bootstrap logic when all peers are lost. Once the DHT routing table hits 0, there's no mechanism to trigger a fresh bootstrap to known bootstrap peers.
+
+---
+
+## Issue 3: No Internet Connectivity
+
+**Indication:**
+- P2P fails to bootstrap
+- All dial attempts fail
+
+**Logs:**
+```
+E GoLog: ERROR basichost basic/basic_host.go:396 failed to resolve local interface addresses {"error": "route ip+net: netlinkrib: permission denied"}
+I GoLog: Failed to connect to bootstrap peer QmaCpDMGvV2B: failed to dial: failed to dial QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ: all dials failed
+```
+
+**Verification:**
+```bash
+adb shell "ping -c 1 8.8.8.8"
+# Output: connect: Network is unreachable
+# Or: 100% packet loss
+```
+
+**Problem:**
+Device has no internet connectivity (WiFi/mobile data not connected or not working). P2P requires internet to reach bootstrap peers.
+
+**Solution:**
+Connect device to a working internet connection (WiFi or mobile data).
+
+---
+
+## Issue 4: IP Address Flapping (Dual-Stack IPv4/IPv6)
+
+**Indication:**
+- Device has both IPv4 and IPv6 connectivity
+- P2P appears unstable with frequent address changes
+
+**Logs:**
+```
+I GoLog: === PEER 12D3KooWSGPo OBSERVED US AT: /ip6/2a0d:6fc7:620:120f:7cc1:35b6:974f:710/udp/45512/quic-v1 ===
+I GoLog: >>> IP CHANGED! Old: 2.54.34.28, New: 2a0d:6fc7:620:120f:7cc1:35b6:974f:710 - CLEARING OLD ADDRESSES
+...
+I GoLog: === PEER 12D3KooWQQkY OBSERVED US AT: /ip4/2.54.34.28/tcp/2687 ===
+I GoLog: >>> IP CHANGED! Old: 2a0d:6fc7:620:120f:7cc1:35b6:974f:710, New: 2.54.34.28 - CLEARING OLD ADDRESSES
+```
+
+**Problem:**
+When different peers observe the device on different IP versions (IPv4 vs IPv6), the code interprets each as an "IP change" and clears previous addresses. This is incorrect behavior for dual-stack hosts where both addresses are valid simultaneously.
+
+**Solution (needs code fix):**
+The Go code should accumulate addresses for dual-stack hosts instead of clearing them when the IP "changes". Both IPv4 and IPv6 addresses should be kept in the peerstore.
+
+---
+
+## Issue 5: Bluetooth Security Validation Failures
+
+**Indication:**
+- BLE mesh packets received but marked as failed validation
+- Messages from known peers rejected
+
+**Logs:**
+```
+D PacketProcessor: Packet failed security validation from bee950e7f2a040fd (Testy10)
+D PacketProcessor: Packet failed security validation from bb136ee766585210 (Testy4)
+```
+
+**Problem:**
+Packets from known peers fail security validation. This could be caused by:
+- Clock drift between devices (timestamp validation failure)
+- Key mismatch or corruption
+- Packet corruption during BLE transmission
+
+**Solution:**
+Not fully investigated. May require checking:
+1. Device clock synchronization
+2. Key exchange/storage integrity
+3. BLE packet fragmentation handling
+
+---
+
+## Issue 6: BLE GATT Connection Failures (Status 133)
+
+**Indication:**
+- Frequent BLE disconnections
+- MTU negotiation failures
+
+**Logs:**
+```
+W BluetoothGattClientManager: Client: Disconnected from 48:A9:D6:C8:00:6B with error status 133
+W BluetoothGattClientManager: MTU negotiation failed for 7D:BC:C5:36:D4:A0 with status: 133. Disconnecting.
+```
+
+**Problem:**
+Status 133 is a common Android BLE error (GATT_ERROR) that can mean various things:
+- Too many simultaneous connections
+- Device out of range
+- BLE stack congestion
+- Hardware-level issues
+
+**Solution:**
+This is a known Android BLE limitation. Mitigations include:
+- Limiting concurrent BLE connections
+- Implementing connection retry with backoff
+- Prioritizing stable connections over discovery
+
+---
+
+## Summary of Required Code Fixes
+
+1. **P2P Auto-Recovery**: Implement automatic re-bootstrap when DHT routing table drops to 0 peers
+   - **STATUS: FIXED** in P2PLibraryRepository.kt - Added health monitoring with automatic recovery
+
+2. **Dual-Stack Address Handling**: Don't clear addresses when IP "changes" between IPv4/IPv6 - accumulate both
+   - **STATUS: REQUIRES GO CODE CHANGE** - This fix must be made in golib (Go libp2p code), not Kotlin
+
+3. **Connection Health Monitoring**: Add periodic health checks and automatic recovery for P2P connections
+   - **STATUS: FIXED** in P2PLibraryRepository.kt - Added startHealthMonitoring() with 30s interval
+
+4. **UI State Accuracy**: Ensure UI reflects actual connection state, not stale cached counts
+   - **STATUS: FIXED** in P2PSettingsSheet.kt - Shows DHT status, health indicator, and recovery button
+
+5. **Duplicate Message Bug**: Messages received 4x due to accumulated collectors
+   - **STATUS: FIXED** in GeohashViewModel.kt - Cancel existing jobs before creating new ones in initialize()
+
+---
+
+## Diagnostic Commands Reference
+
+```bash
+# List connected devices
+adb devices
+
+# Check if app is running
+adb shell "pidof com.bitchat.droid"
+
+# Get P2P logs
+adb logcat -d -t 1000 | grep -E "GoLog|P2PLib|P2PTopics"
+
+# Check for specific errors
+adb logcat -d -t 1000 | grep -E "GoLog" | grep -iE "error|fail|disconnect"
+
+# Check network connectivity
+adb shell "ping -c 1 8.8.8.8"
+
+# Force restart app
+adb shell "am force-stop com.bitchat.droid && am start -n com.bitchat.droid/com.bitchat.android.MainActivity"
+
+# Check P2P connection status
+adb logcat -d -t 300 | grep -E "DHT routing table|Connected peers"
+```
