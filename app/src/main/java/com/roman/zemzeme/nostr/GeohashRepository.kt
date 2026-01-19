@@ -112,6 +112,45 @@ class GeohashRepository(
         updateReactiveParticipantCounts()
     }
 
+    /**
+     * Sync currently connected P2P peers for a geohash.
+     *
+     * This keeps participant counts aligned with live mesh connectivity by:
+     * - refreshing lastSeen for connected peers
+     * - removing disconnected P2P peers immediately
+     */
+    fun syncConnectedP2PPeers(geohash: String, peerIds: List<String>, observedAt: Date = Date()) {
+        val normalizedPeerIds = peerIds
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .map { "p2p:$it" }
+            .toSet()
+
+        val shouldRefresh = withLock {
+            val participants = geohashParticipants.getOrPut(geohash) { mutableMapOf() }
+
+            val iterator = participants.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (entry.key.startsWith("p2p:") && entry.key !in normalizedPeerIds) {
+                    iterator.remove()
+                }
+            }
+
+            normalizedPeerIds.forEach { participantId ->
+                participants[participantId] = observedAt
+            }
+
+            currentGeohash == geohash
+        }
+
+        if (shouldRefresh) {
+            refreshGeohashPeople()
+        }
+        updateReactiveParticipantCounts()
+    }
+
     fun geohashParticipantCount(geohash: String): Int {
         val cutoff = Date(System.currentTimeMillis() - 5 * 60 * 1000)
         val keys = withLock {

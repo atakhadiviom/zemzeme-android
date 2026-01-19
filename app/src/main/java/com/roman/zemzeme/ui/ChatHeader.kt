@@ -152,7 +152,7 @@ fun NicknameEditor(
 
 /**
  * P2P connection status indicator dot.
- * Shows: Orange = connecting, Green = connected, Gray = no peers
+ * Shows: Orange = connecting, Green = connected
  */
 @Composable
 fun P2PConnectionDot(
@@ -162,7 +162,7 @@ fun P2PConnectionDot(
     val dotColor = when (connectionState) {
         com.bitchat.android.p2p.TopicConnectionState.CONNECTING -> Color(0xFFFF9500) // Orange
         com.bitchat.android.p2p.TopicConnectionState.CONNECTED -> Color(0xFF00C851) // Green
-        com.bitchat.android.p2p.TopicConnectionState.NO_PEERS -> Color.Gray
+        com.bitchat.android.p2p.TopicConnectionState.NO_PEERS -> Color(0xFFFF9500)
         com.bitchat.android.p2p.TopicConnectionState.ERROR -> Color.Red
     }
     
@@ -528,15 +528,13 @@ private fun LocationChannelsButton(
     // Get P2P connection state for current geohash channel
     val p2pConnectionState = when (val channel = selectedChannel) {
         is com.bitchat.android.geohash.ChannelID.Location -> {
-            val topicName = "geo:${channel.channel.geohash}"
+            val topicName = channel.channel.geohash
             p2pTopicStates[topicName]?.connectionState
         }
         else -> null
     }
 
-    // Check if P2P needs refresh (no peers or error state)
-    val needsRefresh = p2pConnectionState == com.bitchat.android.p2p.TopicConnectionState.NO_PEERS ||
-            p2pConnectionState == com.bitchat.android.p2p.TopicConnectionState.ERROR
+    val needsRefresh = p2pConnectionState == com.bitchat.android.p2p.TopicConnectionState.ERROR
 
     Button(
         onClick = onClick,
@@ -564,7 +562,7 @@ private fun LocationChannelsButton(
                     modifier = Modifier.size(6.dp)
                 )
 
-                // P2P refresh button (visible when no peers or error)
+                // P2P refresh button (visible only on error)
                 if (needsRefresh) {
                     Spacer(modifier = Modifier.width(2.dp))
                     Icon(
