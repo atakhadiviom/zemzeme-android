@@ -1,5 +1,6 @@
 package com.roman.zemzeme.ui.debug
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -40,11 +41,18 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.res.stringResource
+import androidx.core.content.FileProvider
 import com.roman.zemzeme.R
 import androidx.compose.ui.platform.LocalContext
 import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
 import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTopBar
 import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTitle
+import com.roman.zemzeme.p2p.P2PDebugLogEntry
+import com.roman.zemzeme.p2p.P2PNodeStatus
+import com.roman.zemzeme.p2p.P2PTransport
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun MeshTopologySection() {
@@ -189,6 +197,9 @@ fun DebugSettingsSheet(
                         color = colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 }
+            item {
+                P2PDiagnosticsSection(manager = manager)
+            }
             // Verbose logging toggle
             item {
                 Surface(shape = RoundedCornerShape(12.dp), color = colorScheme.surfaceVariant.copy(alpha = 0.2f)) {
@@ -842,6 +853,283 @@ fun DebugSettingsSheet(
             )
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun P2PDiagnosticsSection(manager: DebugSettingsManager) {
+    val context = LocalContext.current
+    val colorScheme = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
+
+    val p2pTransport = remember { P2PTransport.getInstance(context) }
+    val p2pRepository = remember { p2pTransport.p2pRepository }
+
+    val nodeStatus by p2pRepository.nodeStatus.collectAsState()
+    val dhtStatus by p2pRepository.dhtStatus.collectAsState()
+    val totalConnectedPeers by p2pRepository.totalConnectedPeers.collectAsState()
+    val bandwidthStatsJson by p2pRepository.bandwidthStats.collectAsState()
+    val nodeStartedAt by p2pRepository.nodeStartedAt.collectAsState()
+    val selectedComponent by manager.p2pLogComponent.collectAsState()
+
+    var logs by remember { mutableStateOf<List<P2PDebugLogEntry>>(emptyList()) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var isSharing by remember { mutableStateOf(false) }
+    var lastRefreshedAt by remember { mutableStateOf<Long?>(null) }
+
+    val bandwidthSummary = remember(bandwidthStatsJson) {
+        p2pRepository.getBandwidthSummary(bandwidthStatsJson)
+    }
+
+    val statusColor = when (nodeStatus) {
+        P2PNodeStatus.RUNNING -> Color(0xFF00C851)
+        P2PNodeStatus.STARTING -> Color(0xFFFF9500)
+        P2PNodeStatus.ERROR -> Color(0xFFFF3B30)
+        P2PNodeStatus.STOPPED -> Color(0xFF8E8E93)
+    }
+
+    val statusLabel = when (nodeStatus) {
+        P2PNodeStatus.RUNNING -> "running"
+        P2PNodeStatus.STARTING -> "starting"
+        P2PNodeStatus.ERROR -> "error"
+        P2PNodeStatus.STOPPED -> "stopped"
+    }
+
+    val componentLabels = remember {
+        mapOf(
+            "all" to "All",
+            "node" to "Node",
+            "dht" to "DHT",
+            "stream" to "Stream",
+            "topics" to "Topics",
+            "pubsub" to "PubSub",
+            "bootstrap" to "Bootstrap",
+            "network" to "Network"
+        )
+    }
+
+    suspend fun refreshDiagnosticsAndLogs() {
+        isRefreshing = true
+        try {
+            p2pRepository.refreshDiagnostics()
+            val filter = selectedComponent.takeUnless { it == DebugSettingsManager.P2P_LOG_COMPONENT_ALL }
+            p2pRepository.getDebugLogs(filter)
+                .onSuccess {
+                    logs = it
+                    errorMessage = null
+                    lastRefreshedAt = System.currentTimeMillis()
+                }
+                .onFailure {
+                    errorMessage = it.message ?: "Failed to read P2P logs"
+                }
+        } catch (e: Exception) {
+            errorMessage = e.message ?: "Failed to refresh diagnostics"
+        } finally {
+            isRefreshing = false
+        }
+    }
+
+    LaunchedEffect(selectedComponent) {
+        refreshDiagnosticsAndLogs()
+    }
+
+    Surface(shape = RoundedCornerShape(12.dp), color = colorScheme.surfaceVariant.copy(alpha = 0.2f)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.SettingsEthernet, contentDescription = null, tint = Color(0xFF5AC8FA))
+                Text("p2p diagnostics", fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.weight(1f))
+                Box(Modifier.size(10.dp).background(statusColor, RoundedCornerShape(99.dp)))
+            }
+
+            val uptimeText = nodeStartedAt?.let { startedAt ->
+                formatDuration(System.currentTimeMillis() - startedAt)
+            } ?: "--"
+
+            Text(
+                text = "node: $statusLabel • host peers: $totalConnectedPeers • uptime: $uptimeText",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                color = colorScheme.onSurface.copy(alpha = 0.85f)
+            )
+            Text(
+                text = "dht: ${if (dhtStatus.isBlank()) "unavailable" else dhtStatus}",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                color = colorScheme.onSurface.copy(alpha = 0.75f),
+                maxLines = 3
+            )
+
+            val totalRate = bandwidthSummary.currentRateInBytesPerSec + bandwidthSummary.currentRateOutBytesPerSec
+            Text(
+                text = "bw session: ${p2pRepository.formatBytes(bandwidthSummary.sessionTotalBytes)} • current: ${p2pRepository.formatRate(totalRate)}",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                color = colorScheme.onSurface.copy(alpha = 0.75f)
+            )
+            Text(
+                text = "in ${p2pRepository.formatRate(bandwidthSummary.currentRateInBytesPerSec)} • out ${p2pRepository.formatRate(bandwidthSummary.currentRateOutBytesPerSec)} • daily ${p2pRepository.formatBytes(bandwidthSummary.dailyTotalBytes)}",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                color = colorScheme.onSurface.copy(alpha = 0.65f)
+            )
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DebugSettingsManager.P2P_LOG_COMPONENTS.forEach { component ->
+                    FilterChip(
+                        selected = selectedComponent == component,
+                        onClick = { manager.setP2pLogComponent(component) },
+                        label = {
+                            Text(
+                                componentLabels[component] ?: component,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { scope.launch { refreshDiagnosticsAndLogs() } },
+                    enabled = !isRefreshing,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (isRefreshing) "Refreshing..." else "Refresh")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            isRefreshing = true
+                            p2pRepository.clearDebugLogs()
+                                .onFailure { errorMessage = it.message ?: "Failed to clear logs" }
+                                .onSuccess {
+                                    logs = emptyList()
+                                    errorMessage = null
+                                    lastRefreshedAt = System.currentTimeMillis()
+                                }
+                            isRefreshing = false
+                        }
+                    },
+                    enabled = !isRefreshing,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Clear Logs")
+                }
+            }
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        isSharing = true
+                        val filter = selectedComponent.takeUnless { it == DebugSettingsManager.P2P_LOG_COMPONENT_ALL }
+                        p2pRepository.exportDebugLogs(filter)
+                            .onSuccess { file ->
+                                val uri = FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    file
+                                )
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    putExtra(Intent.EXTRA_SUBJECT, "BitChat P2P diagnostics logs")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                val chooser = Intent.createChooser(shareIntent, "Share P2P logs")
+                                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                try {
+                                    context.startActivity(chooser)
+                                    errorMessage = null
+                                } catch (_: ActivityNotFoundException) {
+                                    errorMessage = "No app found to share logs"
+                                }
+                            }
+                            .onFailure {
+                                errorMessage = it.message ?: "Failed to export logs"
+                            }
+                        isSharing = false
+                    }
+                },
+                enabled = !isSharing,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (isSharing) "Preparing export..." else "Share Logs")
+            }
+
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage ?: "",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = Color(0xFFFF3B30)
+                )
+            }
+
+            if (lastRefreshedAt != null) {
+                Text(
+                    text = "last refresh ${formatLogTimestamp(lastRefreshedAt ?: 0L)}",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    color = colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 220.dp)
+                    .background(colorScheme.surface.copy(alpha = 0.5f))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val visibleLogs = logs.takeLast(40).reversed()
+                if (visibleLogs.isEmpty()) {
+                    Text(
+                        text = "no p2p logs",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                } else {
+                    visibleLogs.forEach { entry ->
+                        Text(
+                            text = "${formatLogTimestamp(entry.timestamp)} ${entry.level}/${entry.component} ${entry.event} ${entry.message}",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            color = colorScheme.onSurface.copy(alpha = 0.9f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatDuration(durationMs: Long): String {
+    if (durationMs <= 0L) return "0s"
+    val totalSeconds = durationMs / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return when {
+        hours > 0 -> "${hours}h ${minutes}m"
+        minutes > 0 -> "${minutes}m ${seconds}s"
+        else -> "${seconds}s"
+    }
+}
+
+private fun formatLogTimestamp(timestamp: Long): String {
+    val safeTs = if (timestamp > 0L) timestamp else System.currentTimeMillis()
+    return SimpleDateFormat("HH:mm:ss", Locale.US).format(Date(safeTs))
 }
 
 @Composable
