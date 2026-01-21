@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import java.util.Date
+import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
 import com.roman.zemzeme.protocol.BitchatPacket
 import com.roman.zemzeme.util.toHexString
@@ -17,6 +18,18 @@ class DebugSettingsManager private constructor() {
     // NOTE: This singleton is referenced from mesh layer. Keep in ui.debug but avoid Compose deps.
     
     companion object {
+        const val P2P_LOG_COMPONENT_ALL = "all"
+        val P2P_LOG_COMPONENTS = listOf(
+            P2P_LOG_COMPONENT_ALL,
+            "node",
+            "dht",
+            "stream",
+            "topics",
+            "pubsub",
+            "bootstrap",
+            "network"
+        )
+
         @Volatile
         private var INSTANCE: DebugSettingsManager? = null
         
@@ -39,6 +52,9 @@ class DebugSettingsManager private constructor() {
     
     private val _packetRelayEnabled = MutableStateFlow(true)
     val packetRelayEnabled: StateFlow<Boolean> = _packetRelayEnabled.asStateFlow()
+
+    private val _p2pLogComponent = MutableStateFlow(P2P_LOG_COMPONENT_ALL)
+    val p2pLogComponent: StateFlow<String> = _p2pLogComponent.asStateFlow()
 
     // Visibility of the debug sheet; gates heavy work
     private val _debugSheetVisible = MutableStateFlow(false)
@@ -63,6 +79,7 @@ class DebugSettingsManager private constructor() {
             _maxConnectionsOverall.value = DebugPreferenceManager.getMaxConnectionsOverall(8)
             _maxServerConnections.value = DebugPreferenceManager.getMaxConnectionsServer(8)
             _maxClientConnections.value = DebugPreferenceManager.getMaxConnectionsClient(8)
+            _p2pLogComponent.value = DebugPreferenceManager.getP2pLogComponent(P2P_LOG_COMPONENT_ALL)
         } catch (_: Exception) {
             // Preferences not ready yet; keep defaults. They will be applied on first change.
         }
@@ -264,6 +281,13 @@ class DebugSettingsManager private constructor() {
         addDebugMessage(DebugMessage.SystemMessage(
             if (enabled) "📡 Packet relay enabled" else "🚫 Packet relay disabled"
         ))
+    }
+
+    fun setP2pLogComponent(component: String) {
+        val normalized = component.trim().lowercase(Locale.US).ifBlank { P2P_LOG_COMPONENT_ALL }
+        val safeComponent = if (normalized in P2P_LOG_COMPONENTS) normalized else P2P_LOG_COMPONENT_ALL
+        DebugPreferenceManager.setP2pLogComponent(safeComponent)
+        _p2pLogComponent.value = safeComponent
     }
 
     fun setMaxConnectionsOverall(value: Int) {

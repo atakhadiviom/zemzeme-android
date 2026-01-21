@@ -29,6 +29,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.ConcurrentHashMap
 
 class GeohashViewModel(
     application: Application,
@@ -79,9 +80,10 @@ class GeohashViewModel(
     
     // P2P watcher jobs for cleanup (prevents accumulated collectors)
     private var p2pNodeStatusJob: Job? = null
-    private var p2pTopicPeersJob: Job? = null
+    private var p2pTopicStatesJob: Job? = null
     private var p2pMessagesJob: Job? = null
     private val p2pMessageSequence = AtomicLong(0L)
+    private val lastConnectedP2PPeerCounts = ConcurrentHashMap<String, Int>()
 
     val geohashPeople: StateFlow<List<GeoPerson>> = state.geohashPeople
     val geohashParticipantCounts: StateFlow<Map<String, Int>> = state.geohashParticipantCounts
@@ -97,8 +99,9 @@ class GeohashViewModel(
         p2pMessagesJob = null
         p2pNodeStatusJob?.cancel()
         p2pNodeStatusJob = null
-        p2pTopicPeersJob?.cancel()
-        p2pTopicPeersJob = null
+        p2pTopicStatesJob?.cancel()
+        p2pTopicStatesJob = null
+        lastConnectedP2PPeerCounts.clear()
 
         subscriptionManager.connect()
         val identity = NostrIdentityBridge.getCurrentNostrIdentity(getApplication())
@@ -171,7 +174,7 @@ class GeohashViewModel(
                                 p2pTopicsRepository.startContinuousRefresh(metaTopicName)
                                 
                                 // Removed immediate boot-time broadcast as it often fires before peers are found
-                                // Presence is now handled in the topicPeers collector below
+                                // Presence is handled when mesh peers transition from 0 -> connected
                             } catch (e: Exception) {
                                 Log.w(TAG, "Failed late P2P subscription: ${e.message}")
                             }
@@ -180,27 +183,36 @@ class GeohashViewModel(
                 }
             }
             
-            // Watch for P2P peer discovery and add peers to participant tracking
-            // This prevents flickering by using the authoritative geohashParticipants source
-            p2pTopicPeersJob = viewModelScope.launch {
-                p2pTopicsRepository.topicPeers.collect { peersMap ->
+            // Watch live topic states (updated every refresh cycle) and keep participant
+            // counts aligned with currently connected P2P peers.
+            p2pTopicStatesJob = viewModelScope.launch {
+                p2pTopicsRepository.topicStates.collect { topicStates ->
                     val currentChannel = state.selectedLocationChannel.value
                     if (currentChannel is com.bitchat.android.geohash.ChannelID.Location) {
                         val geohash = currentChannel.channel.geohash
                         val topicName = p2pMainTopicName(geohash)
                         val metaTopicName = p2pMetaTopicName(geohash)
-                        val peers = peersMap[topicName] ?: emptyList()
-                        if (peers.isNotEmpty()) {
-                            // Add discovered P2P peers to geohashParticipants
-                            // This prevents flickering and ensures proper display name handling
-                            peers.forEach { peerId ->
-                                val participantId = "p2p:$peerId"
-                                repo.updateParticipant(geohash, participantId, Date())
-                            }
-                            Log.d(TAG, "🔄 Added ${peers.size} P2P peers to participant tracking")
-                            
-                            // PRESENCE: Broadcast when we discover peers
-                            // This ensures we tell them who we are once connected
+
+                        val mainPeers = topicStates[topicName]?.peers ?: emptyList()
+                        val metaPeers = topicStates[metaTopicName]?.peers ?: emptyList()
+                        val connectedPeers = (mainPeers + metaPeers)
+                            .map { it.trim() }
+                            .filter { it.isNotBlank() }
+                            .distinct()
+
+                        // Keep participant state synchronized with actual connected peers.
+                        repo.syncConnectedP2PPeers(geohash, connectedPeers, Date())
+
+                        val previousCount = lastConnectedP2PPeerCounts[geohash] ?: 0
+                        val currentCount = connectedPeers.size
+                        lastConnectedP2PPeerCounts[geohash] = currentCount
+
+                        if (currentCount > 0) {
+                            Log.d(TAG, "🔄 Synced $currentCount connected P2P peers for geo:$geohash")
+                        }
+
+                        // Announce presence once when connectivity becomes active.
+                        if (previousCount == 0 && currentCount > 0) {
                             val myNickname = state.getNicknameValue() ?: "anon"
                             p2pTopicsRepository.broadcastPresence(metaTopicName, myNickname)
                         }
@@ -274,8 +286,9 @@ class GeohashViewModel(
         p2pMessagesJob = null
         p2pNodeStatusJob?.cancel()
         p2pNodeStatusJob = null
-        p2pTopicPeersJob?.cancel()
-        p2pTopicPeersJob = null
+        p2pTopicStatesJob?.cancel()
+        p2pTopicStatesJob = null
+        lastConnectedP2PPeerCounts.clear()
         try { NostrIdentityBridge.clearAllAssociations(getApplication()) } catch (_: Exception) {}
         initialize()
     }
@@ -555,6 +568,8 @@ class GeohashViewModel(
     }
 
     private fun switchLocationChannel(channel: com.bitchat.android.geohash.ChannelID?) {
+        val previousGeohash = repo.getCurrentGeohash()
+
         geoTimer?.cancel(); geoTimer = null
         currentGeohashSubId?.let { subscriptionManager.unsubscribe(it); currentGeohashSubId = null }
         currentDmSubId?.let { subscriptionManager.unsubscribe(it); currentDmSubId = null }
@@ -565,6 +580,10 @@ class GeohashViewModel(
         when (channel) {
             is com.bitchat.android.geohash.ChannelID.Mesh -> {
                 Log.d(TAG, "📡 Switched to mesh channel")
+                if (previousGeohash != null) {
+                    repo.syncConnectedP2PPeers(previousGeohash, emptyList())
+                    lastConnectedP2PPeerCounts.remove(previousGeohash)
+                }
                 repo.setCurrentGeohash(null)
                 notificationManager.setCurrentGeohash(null)
                 notificationManager.clearMeshMentionNotifications()
@@ -572,6 +591,10 @@ class GeohashViewModel(
             }
             is com.bitchat.android.geohash.ChannelID.Location -> {
                 Log.d(TAG, "📍 Switching to geohash channel: ${channel.channel.geohash}")
+                if (previousGeohash != null && previousGeohash != channel.channel.geohash) {
+                    repo.syncConnectedP2PPeers(previousGeohash, emptyList())
+                    lastConnectedP2PPeerCounts.remove(previousGeohash)
+                }
                 repo.setCurrentGeohash(channel.channel.geohash)
                 notificationManager.setCurrentGeohash(channel.channel.geohash)
                 notificationManager.clearNotificationsForGeohash(channel.channel.geohash)
@@ -646,6 +669,10 @@ class GeohashViewModel(
             }
             null -> {
                 Log.d(TAG, "📡 No channel selected")
+                if (previousGeohash != null) {
+                    repo.syncConnectedP2PPeers(previousGeohash, emptyList())
+                    lastConnectedP2PPeerCounts.remove(previousGeohash)
+                }
                 repo.setCurrentGeohash(null)
                 repo.refreshGeohashPeople()
             }

@@ -20,6 +20,7 @@ object DebugPreferenceManager {
     // GCS keys (no migration/back-compat)
     private const val KEY_GCS_MAX_BYTES = "gcs_max_filter_bytes"
     private const val KEY_GCS_FPR = "gcs_filter_fpr_percent"
+    private const val KEY_P2P_LOG_COMPONENT = "p2p_log_component"
     // Removed: persistent notification toggle is now governed by MeshServicePreferences.isBackgroundEnabled
 
     private lateinit var prefs: SharedPreferences
@@ -100,6 +101,13 @@ object DebugPreferenceManager {
 
     fun setGcsFprPercent(value: Double) {
         if (ready()) prefs.edit().putLong(KEY_GCS_FPR, java.lang.Double.doubleToRawLongBits(value)).apply()
+    }
+
+    fun getP2pLogComponent(default: String = "all"): String =
+        if (ready()) prefs.getString(KEY_P2P_LOG_COMPONENT, default) ?: default else default
+
+    fun setP2pLogComponent(value: String) {
+        if (ready()) prefs.edit().putString(KEY_P2P_LOG_COMPONENT, value).apply()
     }
 
     // No longer storing persistent notification in debug prefs.
