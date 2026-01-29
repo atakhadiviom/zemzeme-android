@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * BitchatFilePacket: TLV-encoded file transfer payload for BLE mesh.
+ * ZemzemeFilePacket: TLV-encoded file transfer payload for BLE mesh.
  * TLVs:
  *  - 0x01: filename (UTF-8)
  *  - 0x02: file size (8 bytes, UInt64)
@@ -14,11 +14,11 @@ import java.nio.ByteOrder
  * Length field for TLV is 2 bytes (UInt16, big-endian) for all TLVs.
  * For large files, CONTENT is chunked into multiple TLVs of up to 65535 bytes each.
  *
- * Note: The outer BitchatPacket uses version 2 (4-byte payload length), so this
+ * Note: The outer ZemzemePacket uses version 2 (4-byte payload length), so this
  * TLV payload can exceed 64 KiB even though each TLV value is limited to 65535 bytes.
  * Transport-level fragmentation then splits the final packet for BLE MTU.
  */
-data class BitchatFilePacket(
+data class ZemzemeFilePacket(
     val fileName: String,
     val fileSize: Long,
     val mimeType: String,
@@ -31,18 +31,18 @@ data class BitchatFilePacket(
 
     fun encode(): ByteArray? {
         try {
-            android.util.Log.d("BitchatFilePacket", "🔄 Encoding: name=$fileName, size=$fileSize, mime=$mimeType")
+            android.util.Log.d("ZemzemeFilePacket", "🔄 Encoding: name=$fileName, size=$fileSize, mime=$mimeType")
         val nameBytes = fileName.toByteArray(Charsets.UTF_8)
         val mimeBytes = mimeType.toByteArray(Charsets.UTF_8)
         // Validate bounds for 2-byte TLV lengths (per-TLV). CONTENT may exceed 65535 and will be chunked.
         if (nameBytes.size > 0xFFFF || mimeBytes.size > 0xFFFF) {
-                android.util.Log.e("BitchatFilePacket", "❌ TLV field too large: name=${nameBytes.size}, mime=${mimeBytes.size} (max: 65535)")
+                android.util.Log.e("ZemzemeFilePacket", "❌ TLV field too large: name=${nameBytes.size}, mime=${mimeBytes.size} (max: 65535)")
                 return null
             }
             if (content.size > 0xFFFF) {
-                android.util.Log.d("BitchatFilePacket", "📦 Content exceeds 65535 bytes (${content.size}); will be split into multiple CONTENT TLVs")
+                android.util.Log.d("ZemzemeFilePacket", "📦 Content exceeds 65535 bytes (${content.size}); will be split into multiple CONTENT TLVs")
             } else {
-                android.util.Log.d("BitchatFilePacket", "📏 TLV sizes OK: name=${nameBytes.size}, mime=${mimeBytes.size}, content=${content.size}")
+                android.util.Log.d("ZemzemeFilePacket", "📏 TLV sizes OK: name=${nameBytes.size}, mime=${mimeBytes.size}, content=${content.size}")
             }
         val sizeFieldLen = 4 // UInt32 for FILE_SIZE (changed from 8 bytes)
         val contentLenFieldLen = 4 // UInt32 for CONTENT TLV as requested
@@ -73,17 +73,17 @@ data class BitchatFilePacket(
         buf.put(content)
 
         val result = buf.array()
-            android.util.Log.d("BitchatFilePacket", "✅ Encoded successfully: ${result.size} bytes total")
+            android.util.Log.d("ZemzemeFilePacket", "✅ Encoded successfully: ${result.size} bytes total")
             return result
         } catch (e: Exception) {
-            android.util.Log.e("BitchatFilePacket", "❌ Encoding failed: ${e.message}", e)
+            android.util.Log.e("ZemzemeFilePacket", "❌ Encoding failed: ${e.message}", e)
             return null
         }
     }
 
     companion object {
-        fun decode(data: ByteArray): BitchatFilePacket? {
-            android.util.Log.d("BitchatFilePacket", "🔄 Decoding ${data.size} bytes")
+        fun decode(data: ByteArray): ZemzemeFilePacket? {
+            android.util.Log.d("ZemzemeFilePacket", "🔄 Decoding ${data.size} bytes")
             try {
                 var off = 0
                 var name: String? = null
@@ -128,11 +128,11 @@ data class BitchatFilePacket(
                 val c = contentBytes ?: return null
                 val s = size ?: c.size.toLong()
                 val m = mime ?: "application/octet-stream"
-                val result = BitchatFilePacket(n, s, m, c)
-                android.util.Log.d("BitchatFilePacket", "✅ Decoded: name=$n, size=$s, mime=$m, content=${c.size} bytes")
+                val result = ZemzemeFilePacket(n, s, m, c)
+                android.util.Log.d("ZemzemeFilePacket", "✅ Decoded: name=$n, size=$s, mime=$m, content=${c.size} bytes")
                 return result
             } catch (e: Exception) {
-                android.util.Log.e("BitchatFilePacket", "❌ Decoding failed: ${e.message}", e)
+                android.util.Log.e("ZemzemeFilePacket", "❌ Decoding failed: ${e.message}", e)
                 return null
             }
         }

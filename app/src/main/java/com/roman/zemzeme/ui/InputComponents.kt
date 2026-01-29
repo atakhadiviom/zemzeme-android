@@ -302,7 +302,7 @@ fun MessageInput(
                     // Extract and cache waveform from the actual audio file to match receiver rendering
                     AudioWaveformExtractor.extractAsync(path, sampleCount = 120) { arr ->
                         if (arr != null) {
-                            try { com.bitchat.android.features.voice.VoiceWaveformCache.put(path, arr) } catch (_: Exception) {}
+                            try { com.roman.zemzeme.features.voice.VoiceWaveformCache.put(path, arr) } catch (_: Exception) {}
                         }
                     }
                     // BLE path (private or public) — use latest values to avoid stale captures

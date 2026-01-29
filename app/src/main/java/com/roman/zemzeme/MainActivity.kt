@@ -39,7 +39,7 @@ import com.roman.zemzeme.onboarding.PermissionManager
 import com.roman.zemzeme.ui.ChatScreen
 import com.roman.zemzeme.ui.ChatViewModel
 import com.roman.zemzeme.ui.OrientationAwareActivity
-import com.roman.zemzeme.ui.theme.BitchatTheme
+import com.roman.zemzeme.ui.theme.ZemzemeTheme
 import com.roman.zemzeme.nostr.PoWPreferenceManager
 import com.roman.zemzeme.services.VerificationService
 import kotlinx.coroutines.delay
@@ -67,7 +67,7 @@ class MainActivity : OrientationAwareActivity() {
     
     private val forceFinishReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
-            if (intent.action == com.bitchat.android.util.AppConstants.UI.ACTION_FORCE_FINISH) {
+            if (intent.action == com.roman.zemzeme.util.AppConstants.UI.ACTION_FORCE_FINISH) {
                 android.util.Log.i("MainActivity", "Received force finish broadcast, closing UI")
                 finishAffinity()
             }
@@ -78,12 +78,12 @@ class MainActivity : OrientationAwareActivity() {
         super.onCreate(savedInstanceState)
         
         // Register receiver for force finish signal from shutdown coordinator
-        val filter = android.content.IntentFilter(com.bitchat.android.util.AppConstants.UI.ACTION_FORCE_FINISH)
+        val filter = android.content.IntentFilter(com.roman.zemzeme.util.AppConstants.UI.ACTION_FORCE_FINISH)
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             registerReceiver(
                 forceFinishReceiver,
                 filter,
-                com.bitchat.android.util.AppConstants.UI.PERMISSION_FORCE_FINISH,
+                com.roman.zemzeme.util.AppConstants.UI.PERMISSION_FORCE_FINISH,
                 null,
                 android.content.Context.RECEIVER_NOT_EXPORTED
             )
@@ -92,7 +92,7 @@ class MainActivity : OrientationAwareActivity() {
             registerReceiver(
                 forceFinishReceiver,
                 filter,
-                com.bitchat.android.util.AppConstants.UI.PERMISSION_FORCE_FINISH,
+                com.roman.zemzeme.util.AppConstants.UI.PERMISSION_FORCE_FINISH,
                 null
             )
         }
@@ -104,7 +104,7 @@ class MainActivity : OrientationAwareActivity() {
             return
         }
 
-        com.bitchat.android.service.AppShutdownCoordinator.cancelPendingShutdown()
+        com.roman.zemzeme.service.AppShutdownCoordinator.cancelPendingShutdown()
         
         // Enable edge-to-edge display for modern Android look
         enableEdgeToEdge()
@@ -112,8 +112,8 @@ class MainActivity : OrientationAwareActivity() {
         // Initialize permission management
         permissionManager = PermissionManager(this)
         // Ensure foreground service is running and get mesh instance from holder
-        try { com.bitchat.android.service.MeshForegroundService.start(applicationContext) } catch (_: Exception) { }
-        meshService = com.bitchat.android.service.MeshServiceHolder.getOrCreate(applicationContext)
+        try { com.roman.zemzeme.service.MeshForegroundService.start(applicationContext) } catch (_: Exception) { }
+        meshService = com.roman.zemzeme.service.MeshServiceHolder.getOrCreate(applicationContext)
         bluetoothStatusManager = BluetoothStatusManager(
             activity = this,
             context = this,
@@ -143,7 +143,7 @@ class MainActivity : OrientationAwareActivity() {
         )
         
         setContent {
-            BitchatTheme {
+            ZemzemeTheme {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background
@@ -224,7 +224,7 @@ class MainActivity : OrientationAwareActivity() {
                     },
                     onSkip = {
                         // Disable BLE in config and proceed (for emulator testing)
-                        val p2pConfig = com.bitchat.android.p2p.P2PConfig(context)
+                        val p2pConfig = com.roman.zemzeme.p2p.P2PConfig(context)
                         p2pConfig.bleEnabled = false
                         Log.d("MainActivity", "BLE disabled via skip, proceeding without Bluetooth")
                         checkLocationAndProceed()
@@ -372,7 +372,7 @@ class MainActivity : OrientationAwareActivity() {
         
         // Developer bypass: Skip Bluetooth check if BLE is disabled in transport config
         // This allows testing P2P/Nostr on emulators without Bluetooth
-        val p2pConfig = com.bitchat.android.p2p.P2PConfig(this)
+        val p2pConfig = com.roman.zemzeme.p2p.P2PConfig(this)
         if (!p2pConfig.bleEnabled) {
             Log.d("MainActivity", "BLE disabled in config, skipping Bluetooth check")
             checkLocationAndProceed()
@@ -419,7 +419,7 @@ class MainActivity : OrientationAwareActivity() {
                 Log.d("MainActivity", "Existing user with required permissions")
                 if (permissionManager.needsBackgroundLocationPermission() &&
                     !permissionManager.isBackgroundLocationGranted() &&
-                    !com.bitchat.android.onboarding.BackgroundLocationPreferenceManager.isSkipped(this@MainActivity)
+                    !com.roman.zemzeme.onboarding.BackgroundLocationPreferenceManager.isSkipped(this@MainActivity)
                 ) {
                     mainViewModel.updateOnboardingState(OnboardingState.BACKGROUND_LOCATION_EXPLANATION)
                 } else {
@@ -548,7 +548,7 @@ class MainActivity : OrientationAwareActivity() {
         Log.d("MainActivity", "Onboarding completed, checking Bluetooth and Location before initializing app")
         
         // After permissions are granted, re-check Bluetooth, Location, and Battery Optimization status
-        val p2pConfig = com.bitchat.android.p2p.P2PConfig(this)
+        val p2pConfig = com.roman.zemzeme.p2p.P2PConfig(this)
         val currentBluetoothStatus = bluetoothStatusManager.checkBluetoothStatus()
         val currentLocationStatus = locationStatusManager.checkLocationStatus()
         val currentBatteryOptimizationStatus = when {
@@ -684,7 +684,7 @@ class MainActivity : OrientationAwareActivity() {
                 Log.d("MainActivity", "PoW preferences initialized")
                 
                 // Initialize Location Notes Manager (extracted to separate file)
-                com.bitchat.android.nostr.LocationNotesInitializer.initialize(this@MainActivity)
+                com.roman.zemzeme.nostr.LocationNotesInitializer.initialize(this@MainActivity)
                 
                 // Ensure all permissions are still granted (user might have revoked in settings)
                 if (!permissionManager.areAllPermissionsGranted()) {
@@ -726,7 +726,7 @@ class MainActivity : OrientationAwareActivity() {
             return
         }
 
-        com.bitchat.android.service.AppShutdownCoordinator.cancelPendingShutdown()
+        com.roman.zemzeme.service.AppShutdownCoordinator.cancelPendingShutdown()
         
         // Handle notification intents when app is already running
         if (mainViewModel.onboardingState.value == OnboardingState.COMPLETE) {
@@ -744,7 +744,7 @@ class MainActivity : OrientationAwareActivity() {
 
             // Check if Bluetooth was disabled while app was backgrounded
             // Skip this check if BLE is disabled in config (for emulator testing)
-            val p2pConfig = com.bitchat.android.p2p.P2PConfig(this)
+            val p2pConfig = com.roman.zemzeme.p2p.P2PConfig(this)
             if (p2pConfig.bleEnabled) {
                 val currentBluetoothStatus = bluetoothStatusManager.checkBluetoothStatus()
                 if (currentBluetoothStatus != BluetoothStatus.ENABLED) {
@@ -781,19 +781,19 @@ class MainActivity : OrientationAwareActivity() {
      */
     private fun handleNotificationIntent(intent: Intent) {
         val shouldOpenPrivateChat = intent.getBooleanExtra(
-            com.bitchat.android.ui.NotificationManager.EXTRA_OPEN_PRIVATE_CHAT, 
+            com.roman.zemzeme.ui.NotificationManager.EXTRA_OPEN_PRIVATE_CHAT, 
             false
         )
         
         val shouldOpenGeohashChat = intent.getBooleanExtra(
-            com.bitchat.android.ui.NotificationManager.EXTRA_OPEN_GEOHASH_CHAT,
+            com.roman.zemzeme.ui.NotificationManager.EXTRA_OPEN_GEOHASH_CHAT,
             false
         )
         
         when {
             shouldOpenPrivateChat -> {
-                val peerID = intent.getStringExtra(com.bitchat.android.ui.NotificationManager.EXTRA_PEER_ID)
-                val senderNickname = intent.getStringExtra(com.bitchat.android.ui.NotificationManager.EXTRA_SENDER_NICKNAME)
+                val peerID = intent.getStringExtra(com.roman.zemzeme.ui.NotificationManager.EXTRA_PEER_ID)
+                val senderNickname = intent.getStringExtra(com.roman.zemzeme.ui.NotificationManager.EXTRA_SENDER_NICKNAME)
                 
                 if (peerID != null) {
                     Log.d("MainActivity", "Opening private chat with $senderNickname (peerID: $peerID) from notification")
@@ -808,22 +808,22 @@ class MainActivity : OrientationAwareActivity() {
             }
             
             shouldOpenGeohashChat -> {
-                val geohash = intent.getStringExtra(com.bitchat.android.ui.NotificationManager.EXTRA_GEOHASH)
+                val geohash = intent.getStringExtra(com.roman.zemzeme.ui.NotificationManager.EXTRA_GEOHASH)
                 
                 if (geohash != null) {
                     Log.d("MainActivity", "Opening geohash chat #$geohash from notification")
                     
                     // Switch to the geohash channel - create appropriate geohash channel level
                     val level = when (geohash.length) {
-                        7 -> com.bitchat.android.geohash.GeohashChannelLevel.BLOCK
-                        6 -> com.bitchat.android.geohash.GeohashChannelLevel.NEIGHBORHOOD
-                        5 -> com.bitchat.android.geohash.GeohashChannelLevel.CITY
-                        4 -> com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE
-                        2 -> com.bitchat.android.geohash.GeohashChannelLevel.REGION
-                        else -> com.bitchat.android.geohash.GeohashChannelLevel.CITY // Default fallback
+                        7 -> com.roman.zemzeme.geohash.GeohashChannelLevel.BLOCK
+                        6 -> com.roman.zemzeme.geohash.GeohashChannelLevel.NEIGHBORHOOD
+                        5 -> com.roman.zemzeme.geohash.GeohashChannelLevel.CITY
+                        4 -> com.roman.zemzeme.geohash.GeohashChannelLevel.PROVINCE
+                        2 -> com.roman.zemzeme.geohash.GeohashChannelLevel.REGION
+                        else -> com.roman.zemzeme.geohash.GeohashChannelLevel.CITY // Default fallback
                     }
-                    val geohashChannel = com.bitchat.android.geohash.GeohashChannel(level, geohash)
-                    val channelId = com.bitchat.android.geohash.ChannelID.Location(geohashChannel)
+                    val geohashChannel = com.roman.zemzeme.geohash.GeohashChannel(level, geohash)
+                    val channelId = com.roman.zemzeme.geohash.ChannelID.Location(geohashChannel)
                     chatViewModel.selectLocationChannel(channelId)
                     
                     // Update current geohash state for notifications
@@ -838,7 +838,7 @@ class MainActivity : OrientationAwareActivity() {
 
     private fun handleVerificationIntent(intent: Intent) {
         val uri = intent.data ?: return
-        if (uri.scheme != "bitchat" || uri.host != "verify") return
+        if (uri.scheme != "zemzeme" || uri.host != "verify") return
 
         chatViewModel.showVerificationSheet()
         val qr = VerificationService.verifyScannedQR(uri.toString())

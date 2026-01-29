@@ -2,9 +2,9 @@ package com.roman.zemzeme.ui
 
 import android.util.Log
 import com.roman.zemzeme.mesh.BluetoothMeshService
-import com.roman.zemzeme.model.BitchatFilePacket
-import com.roman.zemzeme.model.BitchatMessage
-import com.roman.zemzeme.model.BitchatMessageType
+import com.roman.zemzeme.model.ZemzemeFilePacket
+import com.roman.zemzeme.model.ZemzemeMessage
+import com.roman.zemzeme.model.ZemzemeMessageType
 import java.util.Date
 import java.security.MessageDigest
 
@@ -23,7 +23,7 @@ class MediaSendingManager(
         get() = getMeshService()
     companion object {
         private const val TAG = "MediaSendingManager"
-        private const val MAX_FILE_SIZE = com.bitchat.android.util.AppConstants.Media.MAX_FILE_SIZE_BYTES // 50MB limit
+        private const val MAX_FILE_SIZE = com.roman.zemzeme.util.AppConstants.Media.MAX_FILE_SIZE_BYTES // 50MB limit
     }
 
     // Track in-flight transfer progress: transferId -> messageId and reverse
@@ -47,7 +47,7 @@ class MediaSendingManager(
                 return
             }
 
-            val filePacket = BitchatFilePacket(
+            val filePacket = ZemzemeFilePacket(
                 fileName = file.name,
                 fileSize = file.length(),
                 mimeType = "audio/mp4",
@@ -55,9 +55,9 @@ class MediaSendingManager(
             )
 
             if (toPeerIDOrNull != null) {
-                sendPrivateFile(toPeerIDOrNull, filePacket, filePath, BitchatMessageType.Audio)
+                sendPrivateFile(toPeerIDOrNull, filePacket, filePath, ZemzemeMessageType.Audio)
             } else {
-                sendPublicFile(channelOrNull, filePacket, filePath, BitchatMessageType.Audio)
+                sendPublicFile(channelOrNull, filePacket, filePath, ZemzemeMessageType.Audio)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send voice note: ${e.message}")
@@ -82,7 +82,7 @@ class MediaSendingManager(
                 return
             }
 
-            val filePacket = BitchatFilePacket(
+            val filePacket = ZemzemeFilePacket(
                 fileName = file.name,
                 fileSize = file.length(),
                 mimeType = "image/jpeg",
@@ -90,9 +90,9 @@ class MediaSendingManager(
             )
 
             if (toPeerIDOrNull != null) {
-                sendPrivateFile(toPeerIDOrNull, filePacket, filePath, BitchatMessageType.Image)
+                sendPrivateFile(toPeerIDOrNull, filePacket, filePath, ZemzemeMessageType.Image)
             } else {
-                sendPublicFile(channelOrNull, filePacket, filePath, BitchatMessageType.Image)
+                sendPublicFile(channelOrNull, filePacket, filePath, ZemzemeMessageType.Image)
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ CRITICAL: Image send failed completely", e)
@@ -122,7 +122,7 @@ class MediaSendingManager(
 
             // Use the real MIME type based on extension; fallback to octet-stream
             val mimeType = try { 
-                com.bitchat.android.features.file.FileUtils.getMimeTypeFromExtension(file.name) 
+                com.roman.zemzeme.features.file.FileUtils.getMimeTypeFromExtension(file.name) 
             } catch (_: Exception) { 
                 "application/octet-stream" 
             }
@@ -138,7 +138,7 @@ class MediaSendingManager(
             }
             Log.d(TAG, "📝 Original filename: $originalName")
 
-            val filePacket = BitchatFilePacket(
+            val filePacket = ZemzemeFilePacket(
                 fileName = originalName,
                 fileSize = file.length(),
                 mimeType = mimeType,
@@ -147,9 +147,9 @@ class MediaSendingManager(
             Log.d(TAG, "📦 Created file packet successfully")
 
             val messageType = when {
-                mimeType.lowercase().startsWith("image/") -> BitchatMessageType.Image
-                mimeType.lowercase().startsWith("audio/") -> BitchatMessageType.Audio
-                else -> BitchatMessageType.File
+                mimeType.lowercase().startsWith("image/") -> ZemzemeMessageType.Image
+                mimeType.lowercase().startsWith("audio/") -> ZemzemeMessageType.Audio
+                else -> ZemzemeMessageType.File
             }
 
             if (toPeerIDOrNull != null) {
@@ -170,9 +170,9 @@ class MediaSendingManager(
      */
     private fun sendPrivateFile(
         toPeerID: String,
-        filePacket: BitchatFilePacket,
+        filePacket: ZemzemeFilePacket,
         filePath: String,
-        messageType: BitchatMessageType
+        messageType: ZemzemeMessageType
     ) {
         val payload = filePacket.encode()
         if (payload == null) {
@@ -186,7 +186,7 @@ class MediaSendingManager(
 
         Log.d(TAG, "📤 FILE_TRANSFER send (private): name='${filePacket.fileName}', size=${filePacket.fileSize}, mime='${filePacket.mimeType}', sha256=$contentHash, to=${toPeerID.take(8)} transferId=${transferId.take(16)}…")
 
-        val msg = BitchatMessage(
+        val msg = ZemzemeMessage(
             id = java.util.UUID.randomUUID().toString().uppercase(), // Generate unique ID for each message
             sender = state.getNicknameValue() ?: "me",
             content = filePath,
@@ -208,7 +208,7 @@ class MediaSendingManager(
         // Seed progress so delivery icons render for media
         messageManager.updateMessageDeliveryStatus(
             msg.id,
-            com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(0, 100)
+            com.roman.zemzeme.model.DeliveryStatus.PartiallyDelivered(0, 100)
         )
         
         Log.d(TAG, "📤 Calling meshService.sendFilePrivate to $toPeerID")
@@ -221,9 +221,9 @@ class MediaSendingManager(
      */
     private fun sendPublicFile(
         channelOrNull: String?,
-        filePacket: BitchatFilePacket,
+        filePacket: ZemzemeFilePacket,
         filePath: String,
-        messageType: BitchatMessageType
+        messageType: ZemzemeMessageType
     ) {
         val payload = filePacket.encode()
         if (payload == null) {
@@ -237,7 +237,7 @@ class MediaSendingManager(
         
         Log.d(TAG, "📤 FILE_TRANSFER send (broadcast): name='${filePacket.fileName}', size=${filePacket.fileSize}, mime='${filePacket.mimeType}', sha256=$contentHash, transferId=${transferId.take(16)}…")
 
-        val message = BitchatMessage(
+        val message = ZemzemeMessage(
             id = java.util.UUID.randomUUID().toString().uppercase(), // Generate unique ID for each message
             sender = state.getNicknameValue() ?: meshService.myPeerID,
             content = filePath,
@@ -262,7 +262,7 @@ class MediaSendingManager(
         // Seed progress so animations start immediately
         messageManager.updateMessageDeliveryStatus(
             message.id,
-            com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(0, 100)
+            com.roman.zemzeme.model.DeliveryStatus.PartiallyDelivered(0, 100)
         )
         
         Log.d(TAG, "📤 Calling meshService.sendFileBroadcast")
@@ -318,13 +318,13 @@ class MediaSendingManager(
     /**
      * Handle transfer progress events
      */
-    fun handleTransferProgressEvent(evt: com.bitchat.android.mesh.TransferProgressEvent) {
+    fun handleTransferProgressEvent(evt: com.roman.zemzeme.mesh.TransferProgressEvent) {
         val msgId = synchronized(transferMessageMap) { transferMessageMap[evt.transferId] }
         if (msgId != null) {
             if (evt.completed) {
                 messageManager.updateMessageDeliveryStatus(
                     msgId,
-                    com.bitchat.android.model.DeliveryStatus.Delivered(to = "mesh", at = java.util.Date())
+                    com.roman.zemzeme.model.DeliveryStatus.Delivered(to = "mesh", at = java.util.Date())
                 )
                 synchronized(transferMessageMap) {
                     val msgIdRemoved = transferMessageMap.remove(evt.transferId)
@@ -333,7 +333,7 @@ class MediaSendingManager(
             } else {
                 messageManager.updateMessageDeliveryStatus(
                     msgId,
-                    com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(evt.sent, evt.total)
+                    com.roman.zemzeme.model.DeliveryStatus.PartiallyDelivered(evt.sent, evt.total)
                 )
             }
         }

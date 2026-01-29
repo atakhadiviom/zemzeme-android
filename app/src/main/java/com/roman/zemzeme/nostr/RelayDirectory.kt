@@ -35,7 +35,7 @@ object RelayDirectory {
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val httpClient: OkHttpClient
-        get() = com.bitchat.android.net.OkHttpProvider.httpClient()
+        get() = com.roman.zemzeme.net.OkHttpProvider.httpClient()
 
     data class RelayInfo(
         val url: String,
@@ -89,7 +89,7 @@ object RelayDirectory {
         val snapshot = synchronized(relaysLock) { relays.toList() }
         if (snapshot.isEmpty()) return emptyList()
         val center = try {
-            val c = com.bitchat.android.geohash.Geohash.decodeToCenter(geohash)
+            val c = com.roman.zemzeme.geohash.Geohash.decodeToCenter(geohash)
             c
         } catch (e: Exception) {
             Log.e(TAG, "Failed to decode geohash '$geohash': ${e.message}")

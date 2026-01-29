@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roman.zemzeme.R
 import com.roman.zemzeme.core.ui.component.button.CloseButton
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
 
 private data class SecurityStatusInfo(
     val text: String,
@@ -74,7 +74,7 @@ fun SecurityVerificationSheet(
     val boxColor = if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f)
     val peerHexRegex = remember { Regex("^[0-9a-fA-F]{16}$") }
 
-    BitchatBottomSheet(
+    ZemzemeBottomSheet(
         modifier = modifier,
         onDismissRequest = onDismiss,
     ) {
@@ -186,10 +186,10 @@ private fun buildStatusInfo(
         else -> Icons.Outlined.NoEncryption
     }
     val tint = when {
-        isVerified -> Color(0xFF32D74B)
+        isVerified -> Color(0xFF00F5FF)
         sessionState == "failed" -> Color(0xFFFF3B30)
         sessionState == "handshaking" -> Color(0xFFFF9500)
-        sessionState == "established" -> Color(0xFF32D74B)
+        sessionState == "established" -> Color(0xFF00F5FF)
         else -> accent.copy(alpha = 0.6f)
     }
     return SecurityStatusInfo(text, icon, tint)
@@ -266,9 +266,9 @@ private fun SecurityVerificationActions(
     if (isVerified) {
         VerificationStatusRow(
             icon = Icons.Filled.Verified,
-            iconTint = Color(0xFF32D74B),
+            iconTint = Color(0xFF00F5FF),
             text = stringResource(R.string.fingerprint_verified_label),
-            textTint = Color(0xFF32D74B)
+            textTint = Color(0xFF00F5FF)
         )
         Text(
             text = stringResource(R.string.fingerprint_verified_message),

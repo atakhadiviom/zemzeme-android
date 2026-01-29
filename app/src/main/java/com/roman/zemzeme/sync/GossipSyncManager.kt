@@ -3,7 +3,7 @@ package com.roman.zemzeme.sync
 import android.util.Log
 import com.roman.zemzeme.mesh.BluetoothPacketBroadcaster
 import com.roman.zemzeme.model.RequestSyncPacket
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import com.roman.zemzeme.protocol.SpecialRecipients
 import kotlinx.coroutines.*
@@ -20,9 +20,9 @@ class GossipSyncManager(
     private val configProvider: ConfigProvider
 ) {
     interface Delegate {
-        fun sendPacket(packet: BitchatPacket)
-        fun sendPacketToPeer(peerID: String, packet: BitchatPacket)
-        fun signPacketForBroadcast(packet: BitchatPacket): BitchatPacket
+        fun sendPacket(packet: ZemzemePacket)
+        fun sendPacketToPeer(peerID: String, packet: ZemzemePacket)
+        fun signPacketForBroadcast(packet: ZemzemePacket): ZemzemePacket
     }
 
     interface ConfigProvider {
@@ -43,9 +43,9 @@ class GossipSyncManager(
 
     // Stored packets for sync:
     // - broadcast messages: keep up to seenCapacity() most recent, keyed by packetId
-    private val messages = LinkedHashMap<String, BitchatPacket>()
+    private val messages = LinkedHashMap<String, ZemzemePacket>()
     // - announcements: only keep latest per sender peerID
-    private val latestAnnouncementByPeer = ConcurrentHashMap<String, Pair<String, BitchatPacket>>()
+    private val latestAnnouncementByPeer = ConcurrentHashMap<String, Pair<String, ZemzemePacket>>()
 
     private var periodicJob: Job? = null
     private var cleanupJob: Job? = null
@@ -66,7 +66,7 @@ class GossipSyncManager(
         cleanupJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
                 try {
-                    delay(com.bitchat.android.util.AppConstants.Sync.CLEANUP_INTERVAL_MS)
+                    delay(com.roman.zemzeme.util.AppConstants.Sync.CLEANUP_INTERVAL_MS)
                     pruneStaleAnnouncements()
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { Log.e(TAG, "Periodic cleanup error: ${e.message}") }
@@ -93,7 +93,7 @@ class GossipSyncManager(
         }
     }
 
-    fun onPublicPacketSeen(packet: BitchatPacket) {
+    fun onPublicPacketSeen(packet: ZemzemePacket) {
         // Only ANNOUNCE or broadcast MESSAGE
         val mt = MessageType.fromValue(packet.type)
         val isBroadcastMessage = (mt == MessageType.MESSAGE && (packet.recipientID == null || packet.recipientID.contentEquals(SpecialRecipients.BROADCAST)))
@@ -117,8 +117,8 @@ class GossipSyncManager(
             // Ignore stale announcements older than STALE_PEER_TIMEOUT
             val now = System.currentTimeMillis()
             val age = now - packet.timestamp.toLong()
-            if (age > com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
-                Log.d(TAG, "Ignoring stale ANNOUNCE (age=${age}ms > ${com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS}ms)")
+            if (age > com.roman.zemzeme.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
+                Log.d(TAG, "Ignoring stale ANNOUNCE (age=${age}ms > ${com.roman.zemzeme.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS}ms)")
                 return
             }
             // senderID is fixed-size 8 bytes; map to hex string for key
@@ -136,12 +136,12 @@ class GossipSyncManager(
     private fun sendRequestSync() {
         val payload = buildGcsPayload()
 
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.REQUEST_SYNC.value,
             senderID = hexStringToByteArray(myPeerID),
             timestamp = System.currentTimeMillis().toULong(),
             payload = payload,
-            ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS // neighbors only
+            ttl = com.roman.zemzeme.util.AppConstants.SYNC_TTL_HOPS // neighbors only
         )
         // Sign and broadcast
         val signed = delegate?.signPacketForBroadcast(packet) ?: packet
@@ -151,13 +151,13 @@ class GossipSyncManager(
     private fun sendRequestSyncToPeer(peerID: String) {
         val payload = buildGcsPayload()
 
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.REQUEST_SYNC.value,
             senderID = hexStringToByteArray(myPeerID),
             recipientID = hexStringToByteArray(peerID),
             timestamp = System.currentTimeMillis().toULong(),
             payload = payload,
-            ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS // neighbor only
+            ttl = com.roman.zemzeme.util.AppConstants.SYNC_TTL_HOPS // neighbor only
         )
         Log.d(TAG, "Sending sync request to $peerID (${payload.size} bytes)")
         // Sign and send directly to peer
@@ -185,7 +185,7 @@ class GossipSyncManager(
             val idBytes = hexToBytes(id)
             if (!mightContain(idBytes)) {
                 // Send original packet unchanged to requester only (keep local TTL)
-                val toSend = pkt.copy(ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS)
+                val toSend = pkt.copy(ttl = com.roman.zemzeme.util.AppConstants.SYNC_TTL_HOPS)
                 delegate?.sendPacketToPeer(fromPeerID, toSend)
                 Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.toHexString()} to $fromPeerID packet id ${idBytes.toHexString()}")
             }
@@ -196,7 +196,7 @@ class GossipSyncManager(
         for (pkt in toSendMsgs) {
             val idBytes = PacketIdUtil.computeIdBytes(pkt)
             if (!mightContain(idBytes)) {
-                val toSend = pkt.copy(ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS)
+                val toSend = pkt.copy(ttl = com.roman.zemzeme.util.AppConstants.SYNC_TTL_HOPS)
                 delegate?.sendPacketToPeer(fromPeerID, toSend)
                 Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.toHexString()}")
             }
@@ -230,7 +230,7 @@ class GossipSyncManager(
 
     private fun buildGcsPayload(): ByteArray {
         // Collect candidates: latest announcement per peer + recent broadcast messages
-        val list = ArrayList<BitchatPacket>()
+        val list = ArrayList<ZemzemePacket>()
         // announcements
         for ((_, pair) in latestAnnouncementByPeer) {
             list.add(pair.second)
@@ -267,7 +267,7 @@ class GossipSyncManager(
         for ((peerID, pair) in latestAnnouncementByPeer.entries) {
             val pkt = pair.second
             val age = now - pkt.timestamp.toLong()
-            if (age > com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
+            if (age > com.roman.zemzeme.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
                 stalePeers.add(peerID)
             }
         }

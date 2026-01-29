@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.roman.zemzeme.R
 import com.roman.zemzeme.features.file.FileUtils
-import com.roman.zemzeme.model.BitchatFilePacket
+import com.roman.zemzeme.model.ZemzemeFilePacket
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -35,7 +35,7 @@ import java.io.File
  */
 @Composable
 fun FileViewerDialog(
-    packet: BitchatFilePacket,
+    packet: ZemzemeFilePacket,
     onDismiss: () -> Unit,
     onSaveToDevice: (ByteArray, String) -> Unit
 ) {
@@ -132,7 +132,7 @@ fun FileViewerDialog(
 /**
  * Attempts to open a file using system viewers or save to device
  */
-private fun tryOpenFile(context: Context, packet: BitchatFilePacket) {
+private fun tryOpenFile(context: Context, packet: ZemzemeFilePacket) {
     try {
         // First try to save to temp file and open
         val tempFile = File.createTempFile("bitchat_", ".${packet.fileName.substringAfterLast(".")}", context.cacheDir)

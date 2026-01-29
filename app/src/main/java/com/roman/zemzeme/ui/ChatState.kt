@@ -1,7 +1,7 @@
 package com.roman.zemzeme.ui
 
 import android.util.Log
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,8 +33,8 @@ class ChatState(
 ) {
     
     // Core messages and peer state
-    private val _messages = MutableStateFlow<List<BitchatMessage>>(emptyList())
-    val messages: StateFlow<List<BitchatMessage>> = _messages.asStateFlow()
+    private val _messages = MutableStateFlow<List<ZemzemeMessage>>(emptyList())
+    val messages: StateFlow<List<ZemzemeMessage>> = _messages.asStateFlow()
     
     private val _connectedPeers = MutableStateFlow<List<String>>(emptyList())
     val connectedPeers: StateFlow<List<String>> = _connectedPeers.asStateFlow()
@@ -46,8 +46,8 @@ class ChatState(
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
     
     // Private chats
-    private val _privateChats = MutableStateFlow<Map<String, List<BitchatMessage>>>(emptyMap())
-    val privateChats: StateFlow<Map<String, List<BitchatMessage>>> = _privateChats.asStateFlow()
+    private val _privateChats = MutableStateFlow<Map<String, List<ZemzemeMessage>>>(emptyMap())
+    val privateChats: StateFlow<Map<String, List<ZemzemeMessage>>> = _privateChats.asStateFlow()
     
     private val _selectedPrivateChatPeer = MutableStateFlow<String?>(null)
     val selectedPrivateChatPeer: StateFlow<String?> = _selectedPrivateChatPeer.asStateFlow()
@@ -62,8 +62,8 @@ class ChatState(
     private val _currentChannel = MutableStateFlow<String?>(null)
     val currentChannel: StateFlow<String?> = _currentChannel.asStateFlow()
     
-    private val _channelMessages = MutableStateFlow<Map<String, List<BitchatMessage>>>(emptyMap())
-    val channelMessages: StateFlow<Map<String, List<BitchatMessage>>> = _channelMessages.asStateFlow()
+    private val _channelMessages = MutableStateFlow<Map<String, List<ZemzemeMessage>>>(emptyMap())
+    val channelMessages: StateFlow<Map<String, List<ZemzemeMessage>>> = _channelMessages.asStateFlow()
     
     private val _unreadChannelMessages = MutableStateFlow<Map<String, Int>>(emptyMap())
     val unreadChannelMessages: StateFlow<Map<String, Int>> = _unreadChannelMessages.asStateFlow()
@@ -132,8 +132,8 @@ class ChatState(
     val showSecurityVerificationSheet: StateFlow<Boolean> = _showSecurityVerificationSheet.asStateFlow()
     
     // Location channels state (for Nostr geohash features)
-    private val _selectedLocationChannel = MutableStateFlow<com.bitchat.android.geohash.ChannelID?>(com.bitchat.android.geohash.ChannelID.Mesh)
-    val selectedLocationChannel: StateFlow<com.bitchat.android.geohash.ChannelID?> = _selectedLocationChannel.asStateFlow()
+    private val _selectedLocationChannel = MutableStateFlow<com.roman.zemzeme.geohash.ChannelID?>(com.roman.zemzeme.geohash.ChannelID.Mesh)
+    val selectedLocationChannel: StateFlow<com.roman.zemzeme.geohash.ChannelID?> = _selectedLocationChannel.asStateFlow()
     
     private val _isTeleported = MutableStateFlow<Boolean>(false)
     val isTeleported: StateFlow<Boolean> = _isTeleported.asStateFlow()
@@ -197,7 +197,7 @@ class ChatState(
     fun getGeohashParticipantCountsValue() = _geohashParticipantCounts.value
     
     // Setters for state updates
-    fun setMessages(messages: List<BitchatMessage>) {
+    fun setMessages(messages: List<ZemzemeMessage>) {
         _messages.value = messages
     }
     
@@ -217,7 +217,7 @@ class ChatState(
         _isConnected.value = connected
     }
     
-    fun setPrivateChats(chats: Map<String, List<BitchatMessage>>) {
+    fun setPrivateChats(chats: Map<String, List<ZemzemeMessage>>) {
         _privateChats.value = chats
     }
     
@@ -237,7 +237,7 @@ class ChatState(
         _currentChannel.value = channel
     }
     
-    fun setChannelMessages(messages: Map<String, List<BitchatMessage>>) {
+    fun setChannelMessages(messages: Map<String, List<ZemzemeMessage>>) {
         _channelMessages.value = messages
     }
     
@@ -328,7 +328,7 @@ class ChatState(
         _showSecurityVerificationSheet.value = show
     }
     
-    fun setSelectedLocationChannel(channel: com.bitchat.android.geohash.ChannelID?) {
+    fun setSelectedLocationChannel(channel: com.roman.zemzeme.geohash.ChannelID?) {
         _selectedLocationChannel.value = channel
     }
     

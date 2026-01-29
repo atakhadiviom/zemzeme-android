@@ -77,7 +77,7 @@ fun WaveformPreview(
         baseColor = Color(0x2200FF7F),
         fillColor = when {
             sendProgress != null -> Color(0xFF1E88E5) // blue while sending
-            else -> Color(0xFF00C851) // green during playback
+            else -> Color(0xFF00F5FF) // green during playback
         },
         onSeek = onSeek
     )

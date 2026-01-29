@@ -14,7 +14,7 @@ import java.util.Date
 class GeohashRepository(
     private val application: Application,
     private val state: ChatState,
-    private val dataManager: com.bitchat.android.ui.DataManager
+    private val dataManager: com.roman.zemzeme.ui.DataManager
 ) {
     companion object { private const val TAG = "GeohashRepository" }
 

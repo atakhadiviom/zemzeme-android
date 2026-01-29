@@ -2,13 +2,13 @@ package com.roman.zemzeme.nostr
 
 import android.app.Application
 import android.util.Log
-import com.roman.zemzeme.model.BitchatFilePacket
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeFilePacket
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.model.DeliveryStatus
 import com.roman.zemzeme.model.NoisePayload
 import com.roman.zemzeme.model.NoisePayloadType
 import com.roman.zemzeme.model.PrivateMessagePacket
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.services.SeenMessageStore
 import com.roman.zemzeme.ui.ChatState
 import com.roman.zemzeme.ui.MeshDelegateHandler
@@ -26,7 +26,7 @@ class NostrDirectMessageHandler(
     private val meshDelegateHandler: MeshDelegateHandler,
     private val scope: CoroutineScope,
     private val repo: GeohashRepository,
-    private val dataManager: com.bitchat.android.ui.DataManager
+    private val dataManager: com.roman.zemzeme.ui.DataManager
 ) {
     companion object { private const val TAG = "NostrDirectMessageHandler" }
 
@@ -72,15 +72,15 @@ class NostrDirectMessageHandler(
 
                 val base64Content = content.removePrefix("bitchat1:")
                 val packetData = base64URLDecode(base64Content) ?: return@launch
-                val packet = BitchatPacket.fromBinaryData(packetData) ?: return@launch
+                val packet = ZemzemePacket.fromBinaryData(packetData) ?: return@launch
 
-                if (packet.type != com.bitchat.android.protocol.MessageType.NOISE_ENCRYPTED.value) return@launch
+                if (packet.type != com.roman.zemzeme.protocol.MessageType.NOISE_ENCRYPTED.value) return@launch
 
                 val noisePayload = NoisePayload.decode(packet.payload) ?: return@launch
                 val messageTimestamp = Date(giftWrap.createdAt * 1000L)
                 val convKey = "nostr_${senderPubkey.take(16)}"
                 repo.putNostrKeyMapping(convKey, senderPubkey)
-                com.bitchat.android.nostr.GeohashAliasRegistry.put(convKey, senderPubkey)
+                com.roman.zemzeme.nostr.GeohashAliasRegistry.put(convKey, senderPubkey)
                 if (geohash.isNotEmpty()) {
                     // Remember which geohash this conversation belongs to so we can subscribe on-demand
                     repo.setConversationGeohash(convKey, geohash)
@@ -122,7 +122,7 @@ class NostrDirectMessageHandler(
                 val existingMessages = state.getPrivateChatsValue()[convKey] ?: emptyList()
                 if (existingMessages.any { it.id == pm.messageID }) return
 
-                val message = BitchatMessage(
+                val message = ZemzemeMessage(
                     id = pm.messageID,
                     sender = senderNickname,
                     content = pm.content,
@@ -167,15 +167,15 @@ class NostrDirectMessageHandler(
             }
             NoisePayloadType.FILE_TRANSFER -> {
                 // Properly handle encrypted file transfer
-                val file = BitchatFilePacket.decode(payload.data)
+                val file = ZemzemeFilePacket.decode(payload.data)
                 if (file != null) {
                     val uniqueMsgId = java.util.UUID.randomUUID().toString().uppercase()
-                    val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(application, file)
-                    val message = BitchatMessage(
+                    val savedPath = com.roman.zemzeme.features.file.FileUtils.saveIncomingFile(application, file)
+                    val message = ZemzemeMessage(
                         id = uniqueMsgId,
                         sender = senderNickname,
                         content = savedPath,
-                        type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
+                        type = com.roman.zemzeme.features.file.FileUtils.messageTypeForMime(file.mimeType),
                         timestamp = timestamp,
                         isRelay = false,
                         isPrivate = true,

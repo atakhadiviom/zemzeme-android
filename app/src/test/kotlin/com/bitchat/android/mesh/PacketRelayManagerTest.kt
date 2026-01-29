@@ -2,7 +2,7 @@
 package com.roman.zemzeme.mesh
 
 import com.roman.zemzeme.model.RoutedPacket
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import com.roman.zemzeme.util.toHexString
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,8 +34,8 @@ class PacketRelayManagerTest {
         whenever(delegate.getBroadcastRecipient()).thenReturn(byteArrayOf(0,0,0,0,0,0,0,0))
     }
 
-    private fun createPacket(route: List<ByteArray>?, recipient: String? = null): BitchatPacket {
-        return BitchatPacket(
+    private fun createPacket(route: List<ByteArray>?, recipient: String? = null): ZemzemePacket {
+        return ZemzemePacket(
             type = MessageType.MESSAGE.value,
             senderID = hexStringToPeerBytes(otherPeerID),
             recipientID = recipient?.let { hexStringToPeerBytes(it) },

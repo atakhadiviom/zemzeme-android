@@ -95,7 +95,7 @@ fun LinkPreviewPill(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Link,
-                        contentDescription = stringResource(com.bitchat.android.R.string.cd_link),
+                        contentDescription = stringResource(com.roman.zemzeme.R.string.cd_link),
                         modifier = Modifier.size(24.dp),
                         tint = Color.Blue
                     )

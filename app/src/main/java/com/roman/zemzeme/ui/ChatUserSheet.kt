@@ -15,8 +15,8 @@ import androidx.compose.ui.res.stringResource
 import com.roman.zemzeme.R
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
+import com.roman.zemzeme.model.ZemzemeMessage
 
 /**
  * User Action Sheet for selecting actions on a specific user (slap, hug, block)
@@ -28,7 +28,7 @@ fun ChatUserSheet(
     isPresented: Boolean,
     onDismiss: () -> Unit,
     targetNickname: String,
-    selectedMessage: BitchatMessage? = null,
+    selectedMessage: ZemzemeMessage? = null,
     viewModel: ChatViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -38,13 +38,13 @@ fun ChatUserSheet(
     // iOS system colors (matches LocationChannelsSheet exactly)
     val colorScheme = MaterialTheme.colorScheme
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
-    val standardGreen = if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D) // iOS green
+    val standardGreen = if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D) // iOS green
     val standardBlue = Color(0xFF007AFF) // iOS blue
     val standardRed = Color(0xFFFF3B30) // iOS red
     val standardGrey = if (isDark) Color(0xFF8E8E93) else Color(0xFF6D6D70) // iOS grey
     
     if (isPresented) {
-        BitchatBottomSheet(
+        ZemzemeBottomSheet(
             onDismissRequest = onDismiss,
             modifier = modifier
         ) {
@@ -129,7 +129,7 @@ fun ChatUserSheet(
                                 onClick = {
                                     // Check if we're in a geohash channel
                                     val selectedLocationChannel = viewModel.selectedLocationChannel.value
-                                    if (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location) {
+                                    if (selectedLocationChannel is com.roman.zemzeme.geohash.ChannelID.Location) {
                                         // Get user's nostr public key and add to geohash block list
                                         viewModel.blockUserInGeohash(targetNickname)
                                     } else {

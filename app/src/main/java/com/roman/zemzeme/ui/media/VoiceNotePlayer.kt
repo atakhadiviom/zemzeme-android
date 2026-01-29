@@ -99,7 +99,7 @@ fun VoiceNotePlayer(
             )
         }
         val progressBarColor = progressColor ?: MaterialTheme.colorScheme.primary
-        com.bitchat.android.ui.media.WaveformPreview(
+        com.roman.zemzeme.ui.media.WaveformPreview(
             modifier = Modifier
                 .height(24.dp)
                 .weight(1f)

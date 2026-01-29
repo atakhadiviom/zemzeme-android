@@ -20,7 +20,7 @@ object FileSharingManager {
         context: Context,
         uri: Uri,
         originalName: String? = null
-    ): BitchatFilePacket? {
+    ): ZemzemeFilePacket? {
         return try {
             // Get file name from URI or use original name
             val fileName = originalName ?: getFileNameFromUri(context, uri) ?: "unknown_file"
@@ -39,7 +39,7 @@ object FileSharingManager {
             // Clean up temp file
             file.delete()
 
-            val packet = BitchatFilePacket(
+            val packet = ZemzemeFilePacket(
                 fileName = fileName,
                 fileSize = fileSize,
                 mimeType = mimeType,
@@ -81,7 +81,7 @@ object FileSharingManager {
         val content: ByteArray
     )
 
-    fun processReceivedFile(packet: BitchatFilePacket): ReceivedFileInfo {
+    fun processReceivedFile(packet: ZemzemeFilePacket): ReceivedFileInfo {
         return ReceivedFileInfo(
             fileName = packet.fileName,
             fileSize = packet.fileSize,

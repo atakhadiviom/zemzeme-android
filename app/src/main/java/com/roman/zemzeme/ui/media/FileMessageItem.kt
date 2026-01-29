@@ -33,14 +33,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.roman.zemzeme.features.file.FileUtils
-import com.roman.zemzeme.model.BitchatFilePacket
+import com.roman.zemzeme.model.ZemzemeFilePacket
 
 /**
  * Modern chat-style file message display
  */
 @Composable
 fun FileMessageItem(
-    packet: BitchatFilePacket,
+    packet: ZemzemeFilePacket,
     onFileClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -63,7 +63,7 @@ fun FileMessageItem(
             // File icon
             Icon(
                 imageVector = Icons.Filled.Description,
-                contentDescription = stringResource(com.bitchat.android.R.string.cd_file),
+                contentDescription = stringResource(com.roman.zemzeme.R.string.cd_file),
                 tint = getFileIconColor(packet.fileName),
                 modifier = Modifier.size(32.dp)
             )

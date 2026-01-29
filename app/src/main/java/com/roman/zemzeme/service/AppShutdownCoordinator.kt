@@ -49,9 +49,9 @@ object AppShutdownCoordinator {
         val job = scope.launch {
             // Signal UI to finish gracefully before we kill the process
             try {
-                val intent = android.content.Intent(com.bitchat.android.util.AppConstants.UI.ACTION_FORCE_FINISH)
+                val intent = android.content.Intent(com.roman.zemzeme.util.AppConstants.UI.ACTION_FORCE_FINISH)
                     .setPackage(app.packageName)
-                app.sendBroadcast(intent, com.bitchat.android.util.AppConstants.UI.PERMISSION_FORCE_FINISH)
+                app.sendBroadcast(intent, com.roman.zemzeme.util.AppConstants.UI.PERMISSION_FORCE_FINISH)
             } catch (_: Exception) { }
 
             // Stop mesh (best-effort)
@@ -64,7 +64,7 @@ object AppShutdownCoordinator {
             }
 
             // Clear AppState in-memory store
-            try { com.bitchat.android.services.AppStateStore.clear() } catch (_: Exception) { }
+            try { com.roman.zemzeme.services.AppStateStore.clear() } catch (_: Exception) { }
 
             // Stop foreground and clear notification
             try { stopForeground() } catch (_: Exception) { }

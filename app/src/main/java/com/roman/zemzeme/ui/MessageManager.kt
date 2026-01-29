@@ -1,6 +1,6 @@
 package com.roman.zemzeme.ui
 
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.model.DeliveryStatus
 import java.util.*
 import java.util.Collections
@@ -13,22 +13,22 @@ class MessageManager(private val state: ChatState) {
     // Message deduplication - FIXED: Prevent duplicate messages from dual connection paths
     private val processedUIMessages = Collections.synchronizedSet(mutableSetOf<String>())
     private val recentSystemEvents = Collections.synchronizedMap(mutableMapOf<String, Long>())
-    private val MESSAGE_DEDUP_TIMEOUT = com.bitchat.android.util.AppConstants.UI.MESSAGE_DEDUP_TIMEOUT_MS // 30 seconds
-    private val SYSTEM_EVENT_DEDUP_TIMEOUT = com.bitchat.android.util.AppConstants.UI.SYSTEM_EVENT_DEDUP_TIMEOUT_MS // 5 seconds
+    private val MESSAGE_DEDUP_TIMEOUT = com.roman.zemzeme.util.AppConstants.UI.MESSAGE_DEDUP_TIMEOUT_MS // 30 seconds
+    private val SYSTEM_EVENT_DEDUP_TIMEOUT = com.roman.zemzeme.util.AppConstants.UI.SYSTEM_EVENT_DEDUP_TIMEOUT_MS // 5 seconds
     
     // MARK: - Public Message Management
     
-    fun addMessage(message: BitchatMessage) {
+    fun addMessage(message: ZemzemeMessage) {
         val currentMessages = state.getMessagesValue().toMutableList()
         currentMessages.add(message)
         state.setMessages(currentMessages)
         // Reflect into process-wide store so snapshot replacements don't drop local outgoing messages
-        try { com.bitchat.android.services.AppStateStore.addPublicMessage(message) } catch (_: Exception) { }
+        try { com.roman.zemzeme.services.AppStateStore.addPublicMessage(message) } catch (_: Exception) { }
     }
 
     // Log a system message into the main chat (visible to user)
     fun addSystemMessage(text: String) {
-        val sys = BitchatMessage(
+        val sys = ZemzemeMessage(
             sender = "system",
             content = text,
             timestamp = Date(),
@@ -44,7 +44,7 @@ class MessageManager(private val state: ChatState) {
     
     // MARK: - Channel Message Management
     
-    fun addChannelMessage(channel: String, message: BitchatMessage) {
+    fun addChannelMessage(channel: String, message: ZemzemeMessage) {
         val currentChannelMessages = state.getChannelMessagesValue().toMutableMap()
         if (!currentChannelMessages.containsKey(channel)) {
             currentChannelMessages[channel] = mutableListOf()
@@ -55,7 +55,7 @@ class MessageManager(private val state: ChatState) {
         currentChannelMessages[channel] = channelMessageList
         state.setChannelMessages(currentChannelMessages)
         // Reflect into process-wide store
-        try { com.bitchat.android.services.AppStateStore.addChannelMessage(channel, message) } catch (_: Exception) { }
+        try { com.roman.zemzeme.services.AppStateStore.addChannelMessage(channel, message) } catch (_: Exception) { }
         
         // Update unread count if not currently viewing this channel
         // Consider both classic channels (state.currentChannel) and geohash location channel selection
@@ -64,7 +64,7 @@ class MessageManager(private val state: ChatState) {
             if (channel.startsWith("geo:")) {
                 val geo = channel.removePrefix("geo:")
                 val selected = state.selectedLocationChannel.value
-                selected is com.bitchat.android.geohash.ChannelID.Location && selected.channel.geohash.equals(geo, ignoreCase = true)
+                selected is com.roman.zemzeme.geohash.ChannelID.Location && selected.channel.geohash.equals(geo, ignoreCase = true)
             } else false
         } catch (_: Exception) { false }
 
@@ -99,7 +99,7 @@ class MessageManager(private val state: ChatState) {
     
     // MARK: - Private Message Management
 
-    fun addPrivateMessage(peerID: String, message: BitchatMessage) {
+    fun addPrivateMessage(peerID: String, message: ZemzemeMessage) {
         val currentPrivateChats = state.getPrivateChatsValue().toMutableMap()
         if (!currentPrivateChats.containsKey(peerID)) {
             currentPrivateChats[peerID] = mutableListOf()
@@ -110,7 +110,7 @@ class MessageManager(private val state: ChatState) {
         currentPrivateChats[peerID] = chatMessages
         state.setPrivateChats(currentPrivateChats)
         // Reflect into process-wide store
-        try { com.bitchat.android.services.AppStateStore.addPrivateMessage(peerID, message) } catch (_: Exception) { }
+        try { com.roman.zemzeme.services.AppStateStore.addPrivateMessage(peerID, message) } catch (_: Exception) { }
         
         // Mark as unread if not currently viewing this chat
         if (state.getSelectedPrivateChatPeerValue() != peerID && message.sender != state.getNicknameValue()) {
@@ -121,7 +121,7 @@ class MessageManager(private val state: ChatState) {
     }
 
     // Variant that does not mark unread (used when we know the message has been read already, e.g., persisted Nostr read store)
-    fun addPrivateMessageNoUnread(peerID: String, message: BitchatMessage) {
+    fun addPrivateMessageNoUnread(peerID: String, message: ZemzemeMessage) {
         val currentPrivateChats = state.getPrivateChatsValue().toMutableMap()
         if (!currentPrivateChats.containsKey(peerID)) {
             currentPrivateChats[peerID] = mutableListOf()
@@ -131,7 +131,7 @@ class MessageManager(private val state: ChatState) {
         currentPrivateChats[peerID] = chatMessages
         state.setPrivateChats(currentPrivateChats)
         // Reflect into process-wide store
-        try { com.bitchat.android.services.AppStateStore.addPrivateMessage(peerID, message) } catch (_: Exception) { }
+        try { com.roman.zemzeme.services.AppStateStore.addPrivateMessage(peerID, message) } catch (_: Exception) { }
     }
     
     fun clearPrivateMessages(peerID: String) {
@@ -159,7 +159,7 @@ class MessageManager(private val state: ChatState) {
     /**
      * Generate a unique key for message deduplication
      */
-    fun generateMessageKey(message: BitchatMessage): String {
+    fun generateMessageKey(message: ZemzemeMessage): String {
         val senderKey = message.senderPeerID ?: message.sender
         val contentHash = message.content.hashCode()
         return "$senderKey-${message.timestamp.time}-$contentHash"
@@ -251,7 +251,7 @@ class MessageManager(private val state: ChatState) {
         if (updated) {
             state.setPrivateChats(updatedPrivateChats)
             // Keep process-wide store in sync to prevent snapshot overwrites resetting status
-            try { com.bitchat.android.services.AppStateStore.updatePrivateMessageStatus(messageID, status) } catch (_: Exception) { }
+            try { com.roman.zemzeme.services.AppStateStore.updatePrivateMessageStatus(messageID, status) } catch (_: Exception) { }
         }
         
         // Update in main messages

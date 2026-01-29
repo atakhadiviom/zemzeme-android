@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.mesh.BluetoothMeshService
 import androidx.compose.material3.ColorScheme
 import com.roman.zemzeme.ui.theme.BASE_FONT_SIZE
@@ -40,7 +40,7 @@ fun getRSSIColor(rssi: Int): Color {
  * Timestamp at END, peer colors, hashtag suffix handling
  */
 fun formatMessageAsAnnotatedString(
-    message: BitchatMessage,
+    message: ZemzemeMessage,
     currentUserNickname: String,
     meshService: BluetoothMeshService,
     colorScheme: ColorScheme,
@@ -161,7 +161,7 @@ fun formatMessageAsAnnotatedString(
  * Build only the nickname + timestamp header line for a message, matching styles of normal messages.
  */
 fun formatMessageHeaderAnnotatedString(
-    message: BitchatMessage,
+    message: ZemzemeMessage,
     currentUserNickname: String,
     meshService: BluetoothMeshService,
     colorScheme: ColorScheme,
@@ -260,7 +260,7 @@ fun formatMessageHeaderAnnotatedString(
  * iOS-style peer color assignment using djb2 hash algorithm
  * Avoids orange (~30°) reserved for self messages
  */
-fun getPeerColor(message: BitchatMessage, isDark: Boolean): Color {
+fun getPeerColor(message: ZemzemeMessage, isDark: Boolean): Color {
     // Create seed from peer identifier (prioritizing stable keys)
     val seed = when {
         message.senderPeerID?.startsWith("nostr:") == true || message.senderPeerID?.startsWith("nostr_") == true -> {
@@ -327,6 +327,192 @@ fun splitSuffix(name: String): Pair<String, String> {
     }
     
     return Pair(name, "")
+}
+
+/**
+ * Format only message content (for modern bubble UI)
+ * Returns just the message text with mentions, hashtags, and links styled
+ */
+fun formatMessageContentOnly(
+    message: ZemzemeMessage,
+    currentUserNickname: String,
+    colorScheme: ColorScheme,
+    isSelf: Boolean
+): AnnotatedString {
+    val builder = AnnotatedString.Builder()
+    val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
+
+    // Content color - use theme color instead of peer color for cleaner bubble appearance
+    val contentColor = colorScheme.onSurface
+
+    // Format content with mentions, hashtags, and links
+    appendModernFormattedContent(
+        builder = builder,
+        content = message.content,
+        mentions = message.mentions,
+        currentUserNickname = currentUserNickname,
+        contentColor = contentColor,
+        isSelf = isSelf,
+        isDark = isDark
+    )
+
+    return builder.toAnnotatedString()
+}
+
+/**
+ * Modern content formatting for bubble UI
+ */
+private fun appendModernFormattedContent(
+    builder: AnnotatedString.Builder,
+    content: String,
+    mentions: List<String>?,
+    currentUserNickname: String,
+    contentColor: Color,
+    isSelf: Boolean,
+    isDark: Boolean
+) {
+    val mentionPattern = "@([\\p{L}0-9_]+(?:#[a-fA-F0-9]{4})?)".toRegex()
+    val mentionMatches = mentionPattern.findAll(content).toList()
+
+    val mentionRanges = mentionMatches.map { it.range }
+    fun overlapsMention(range: IntRange): Boolean {
+        return mentionRanges.any { mentionRange ->
+            range.first < mentionRange.last && range.last > mentionRange.first
+        }
+    }
+
+    val allMatches = mutableListOf<Pair<IntRange, String>>()
+
+    // Add mention matches
+    for (match in mentionMatches) {
+        allMatches.add(match.range to "mention")
+    }
+
+    // Add geohash matches
+    val geoMatches = MessageSpecialParser.findStandaloneGeohashes(content)
+    for (gm in geoMatches) {
+        val range = gm.start until gm.endExclusive
+        if (!overlapsMention(range)) {
+            allMatches.add(range to "geohash")
+        }
+    }
+
+    // Add URL matches
+    val urlMatches = MessageSpecialParser.findUrls(content)
+    for (um in urlMatches) {
+        val range = um.start until um.endExclusive
+        if (!overlapsMention(range)) {
+            allMatches.add(range to "url")
+        }
+    }
+
+    // Remove overlaps
+    fun rangesOverlap(a: IntRange, b: IntRange): Boolean {
+        return a.first < b.last && a.last > b.first
+    }
+    val urlRanges = allMatches.filter { it.second == "url" }.map { it.first }
+    val geoRanges = allMatches.filter { it.second == "geohash" }.map { it.first }
+    if (geoRanges.isNotEmpty() || urlRanges.isNotEmpty()) {
+        val iterator = allMatches.listIterator()
+        while (iterator.hasNext()) {
+            val (range, type) = iterator.next()
+            val overlapsGeo = geoRanges.any { rangesOverlap(range, it) }
+            val overlapsUrl = urlRanges.any { rangesOverlap(range, it) }
+            if ((type == "geohash" && overlapsUrl)) iterator.remove()
+        }
+    }
+
+    allMatches.sortBy { it.first.first }
+
+    var lastEnd = 0
+    val isMentioned = mentions?.contains(currentUserNickname) == true
+
+    for ((range, type) in allMatches) {
+        // Add text before match
+        if (lastEnd < range.first) {
+            val beforeText = content.substring(lastEnd, range.first)
+            if (beforeText.isNotEmpty()) {
+                builder.pushStyle(SpanStyle(
+                    color = contentColor,
+                    fontWeight = if (isMentioned) FontWeight.Bold else FontWeight.Normal
+                ))
+                builder.append(beforeText)
+                builder.pop()
+            }
+        }
+
+        // Add styled match
+        val matchText = content.substring(range.first, range.last + 1)
+        when (type) {
+            "mention" -> {
+                val mentionWithoutAt = matchText.removePrefix("@")
+                val (mBase, mSuffix) = splitSuffix(mentionWithoutAt)
+                val isMentionToMe = mBase == currentUserNickname
+                val mentionColor = if (isMentionToMe) Color(0xFFFF9500) else Color(0xFF007AFF)
+
+                builder.pushStyle(SpanStyle(
+                    color = mentionColor,
+                    fontWeight = FontWeight.SemiBold
+                ))
+                builder.append("@")
+                builder.append(truncateNickname(mBase))
+                if (mSuffix.isNotEmpty()) {
+                    builder.pushStyle(SpanStyle(color = mentionColor.copy(alpha = 0.6f)))
+                    builder.append(mSuffix)
+                    builder.pop()
+                }
+                builder.pop()
+            }
+            "geohash" -> {
+                builder.pushStyle(SpanStyle(
+                    color = Color(0xFF007AFF),
+                    fontWeight = FontWeight.SemiBold,
+                    textDecoration = TextDecoration.Underline
+                ))
+                val start = builder.length
+                builder.append(matchText)
+                val end = builder.length
+                val geohash = matchText.removePrefix("#").lowercase()
+                builder.addStringAnnotation(
+                    tag = "geohash_click",
+                    annotation = geohash,
+                    start = start,
+                    end = end
+                )
+                builder.pop()
+            }
+            "url" -> {
+                builder.pushStyle(SpanStyle(
+                    color = Color(0xFF007AFF),
+                    fontWeight = FontWeight.SemiBold,
+                    textDecoration = TextDecoration.Underline
+                ))
+                val start = builder.length
+                builder.append(matchText)
+                val end = builder.length
+                builder.addStringAnnotation(
+                    tag = "url_click",
+                    annotation = matchText,
+                    start = start,
+                    end = end
+                )
+                builder.pop()
+            }
+        }
+
+        lastEnd = range.last + 1
+    }
+
+    // Add remaining text
+    if (lastEnd < content.length) {
+        val remainingText = content.substring(lastEnd)
+        builder.pushStyle(SpanStyle(
+            color = contentColor,
+            fontWeight = if (isMentioned) FontWeight.Bold else FontWeight.Normal
+        ))
+        builder.append(remainingText)
+        builder.pop()
+    }
 }
 
 /**

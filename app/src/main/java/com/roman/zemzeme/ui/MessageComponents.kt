@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
- 
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +21,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,7 +30,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import android.content.Intent
 import android.net.Uri
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.model.DeliveryStatus
 import com.roman.zemzeme.mesh.BluetoothMeshService
 import java.text.SimpleDateFormat
@@ -42,12 +43,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import com.roman.zemzeme.ui.media.FileMessageItem
-import com.roman.zemzeme.model.BitchatMessageType
+import com.roman.zemzeme.model.ZemzemeMessageType
 import com.roman.zemzeme.R
 import androidx.compose.ui.res.stringResource
+import com.roman.zemzeme.ui.theme.ZemzemeShapes
+import com.roman.zemzeme.ui.theme.ZemzemeElevation
+import com.roman.zemzeme.ui.theme.extendedColors
 
 
-// VoiceNotePlayer moved to com.bitchat.android.ui.media.VoiceNotePlayer
+// VoiceNotePlayer moved to com.roman.zemzeme.ui.media.VoiceNotePlayer
 
 /**
  * Message display components for ChatScreen
@@ -56,15 +60,15 @@ import androidx.compose.ui.res.stringResource
 
 @Composable
 fun MessagesList(
-    messages: List<BitchatMessage>,
+    messages: List<ZemzemeMessage>,
     currentUserNickname: String,
     meshService: BluetoothMeshService,
     modifier: Modifier = Modifier,
     forceScrollToBottom: Boolean = false,
     onScrolledUpChanged: ((Boolean) -> Unit)? = null,
     onNicknameClick: ((String) -> Unit)? = null,
-    onMessageLongPress: ((BitchatMessage) -> Unit)? = null,
-    onCancelTransfer: ((BitchatMessage) -> Unit)? = null,
+    onMessageLongPress: ((ZemzemeMessage) -> Unit)? = null,
+    onCancelTransfer: ((ZemzemeMessage) -> Unit)? = null,
     onImageClick: ((String, List<String>, Int) -> Unit)? = null
 ) {
     val listState = rememberLazyListState()
@@ -109,8 +113,8 @@ fun MessagesList(
     
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier,
         reverseLayout = true
     ) {
@@ -135,84 +139,500 @@ fun MessagesList(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageItem(
-    message: BitchatMessage,
+    message: ZemzemeMessage,
     currentUserNickname: String,
     meshService: BluetoothMeshService,
-    messages: List<BitchatMessage> = emptyList(),
+    messages: List<ZemzemeMessage> = emptyList(),
     onNicknameClick: ((String) -> Unit)? = null,
-    onMessageLongPress: ((BitchatMessage) -> Unit)? = null,
-    onCancelTransfer: ((BitchatMessage) -> Unit)? = null,
+    onMessageLongPress: ((ZemzemeMessage) -> Unit)? = null,
+    onCancelTransfer: ((ZemzemeMessage) -> Unit)? = null,
     onImageClick: ((String, List<String>, Int) -> Unit)? = null
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val timeFormatter = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
-    
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
+    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+
+    // Determine if this message was sent by self
+    val isSelf = message.senderPeerID == meshService.myPeerID ||
+                 message.sender == currentUserNickname ||
+                 message.sender.startsWith("$currentUserNickname#")
+
+    // System messages remain centered without bubbles
+    if (message.sender == "system") {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "* ${message.content} *",
+                fontStyle = FontStyle.Italic,
+                fontSize = 12.sp,
+                color = Color.Gray.copy(alpha = 0.7f),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        }
+        return
+    }
+
+    val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
+    val baseColor = if (isSelf) Color(0xFFFF9500) else getPeerColor(message, isDark)
+    val (baseName, suffix) = splitSuffix(message.sender)
+
+    // Modern message layout with avatar
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = if (isSelf) Arrangement.End else Arrangement.Start
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.Top
+        // Message content column with sender name and bubble
+        Row(
+            horizontalArrangement = if (isSelf) Arrangement.End else Arrangement.Start,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            // For received messages, show avatar on the left, aligned with bubble
+            if (!isSelf) {
+                AvatarCircle(
+                    letter = baseName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    color = baseColor,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+
+            // Message content column - wraps content width
+            Column(
+                horizontalAlignment = if (isSelf) Alignment.End else Alignment.Start
             ) {
-                // Provide a small end padding for own private messages so overlay doesn't cover text
-                val endPad = if (message.isPrivate && message.sender == currentUserNickname) 16.dp else 0.dp
-                // Create a custom layout that combines selectable text with clickable nickname areas
-                MessageTextWithClickableNicknames(
+                // Sender name (only for received messages)
+                if (!isSelf) {
+                    val haptic = LocalHapticFeedback.current
+                    Text(
+                        text = truncateNickname(baseName) + suffix,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = baseColor,
+                        modifier = Modifier
+                            .padding(bottom = 4.dp, start = 4.dp)
+                            .clickable(enabled = onNicknameClick != null) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onNicknameClick?.invoke(message.originalSender ?: message.sender)
+                            }
+                    )
+                }
+
+                // Message bubble - wraps content
+                MessageBubble(
                     message = message,
                     messages = messages,
                     currentUserNickname = currentUserNickname,
                     meshService = meshService,
                     colorScheme = colorScheme,
                     timeFormatter = timeFormatter,
+                    isSelf = isSelf,
                     onNicknameClick = onNicknameClick,
                     onMessageLongPress = onMessageLongPress,
                     onCancelTransfer = onCancelTransfer,
-                    onImageClick = onImageClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = endPad)
+                    onImageClick = onImageClick
                 )
             }
+        }
+    }
+}
 
-            // Delivery status for private messages (overlay, non-displacing)
-            if (message.isPrivate && message.sender == currentUserNickname) {
-                message.deliveryStatus?.let { status ->
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = 2.dp)
-                    ) {
+@Composable
+private fun AvatarCircle(
+    letter: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(36.dp)
+            .background(color.copy(alpha = 0.2f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = letter,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun MessageBubble(
+    message: ZemzemeMessage,
+    messages: List<ZemzemeMessage>,
+    currentUserNickname: String,
+    meshService: BluetoothMeshService,
+    colorScheme: ColorScheme,
+    timeFormatter: SimpleDateFormat,
+    isSelf: Boolean,
+    onNicknameClick: ((String) -> Unit)?,
+    onMessageLongPress: ((ZemzemeMessage) -> Unit)?,
+    onCancelTransfer: ((ZemzemeMessage) -> Unit)?,
+    onImageClick: ((String, List<String>, Int) -> Unit)?
+) {
+    val extendedColors = MaterialTheme.extendedColors
+
+    // Bubble background color from theme
+    val bubbleColor = if (isSelf) {
+        extendedColors.sentBubble
+    } else {
+        extendedColors.receivedBubble
+    }
+
+    // Cyberpunk bubble shape with "tail" effect
+    // Sent messages: tail on bottom-right (20dp, 20dp, 6dp, 20dp)
+    // Received messages: tail on bottom-left (20dp, 20dp, 20dp, 6dp)
+    val bubbleShape = if (isSelf) {
+        RoundedCornerShape(
+            topStart = ZemzemeShapes.MessageBubbleRadius,
+            topEnd = ZemzemeShapes.MessageBubbleRadius,
+            bottomEnd = ZemzemeShapes.MessageBubbleRadiusSmall,
+            bottomStart = ZemzemeShapes.MessageBubbleRadius
+        )
+    } else {
+        RoundedCornerShape(
+            topStart = ZemzemeShapes.MessageBubbleRadius,
+            topEnd = ZemzemeShapes.MessageBubbleRadius,
+            bottomEnd = ZemzemeShapes.MessageBubbleRadius,
+            bottomStart = ZemzemeShapes.MessageBubbleRadiusSmall
+        )
+    }
+
+    Surface(
+        modifier = Modifier.wrapContentWidth(),
+        shape = bubbleShape,
+        color = bubbleColor,
+        tonalElevation = ZemzemeElevation.Low,
+        shadowElevation = ZemzemeElevation.Low
+    ) {
+        Column(
+            modifier = Modifier
+                .wrapContentWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            // Message content
+            MessageBubbleContent(
+                message = message,
+                messages = messages,
+                currentUserNickname = currentUserNickname,
+                meshService = meshService,
+                colorScheme = colorScheme,
+                timeFormatter = timeFormatter,
+                isSelf = isSelf,
+                onNicknameClick = onNicknameClick,
+                onMessageLongPress = onMessageLongPress,
+                onCancelTransfer = onCancelTransfer,
+                onImageClick = onImageClick
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Timestamp row at the bottom
+            Row(
+                modifier = Modifier.wrapContentWidth(),
+                horizontalArrangement = if (isSelf) Arrangement.End else Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = timeFormatter.format(message.timestamp),
+                    fontSize = 11.sp,
+                    color = Color.Gray.copy(alpha = 0.7f)
+                )
+
+                // PoW badge
+                message.powDifficulty?.let { bits ->
+                    if (bits > 0) {
+                        Text(
+                            text = " ⛨${bits}b",
+                            fontSize = 10.sp,
+                            color = Color.Gray.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                // Delivery status for private messages
+                if (message.isPrivate && isSelf) {
+                    message.deliveryStatus?.let { status ->
+                        Spacer(modifier = Modifier.width(4.dp))
                         DeliveryStatusIcon(status = status)
                     }
                 }
             }
         }
-        
-        // Link previews removed; links are now highlighted inline and clickable within the message text
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun MessageBubbleContent(
+    message: ZemzemeMessage,
+    messages: List<ZemzemeMessage>,
+    currentUserNickname: String,
+    meshService: BluetoothMeshService,
+    colorScheme: ColorScheme,
+    timeFormatter: SimpleDateFormat,
+    isSelf: Boolean,
+    onNicknameClick: ((String) -> Unit)?,
+    onMessageLongPress: ((ZemzemeMessage) -> Unit)?,
+    onCancelTransfer: ((ZemzemeMessage) -> Unit)?,
+    onImageClick: ((String, List<String>, Int) -> Unit)?
+) {
+    // Handle special message types
+    when (message.type) {
+        ZemzemeMessageType.Image -> {
+            com.roman.zemzeme.ui.media.ImageMessageItem(
+                message = message,
+                messages = messages,
+                currentUserNickname = currentUserNickname,
+                meshService = meshService,
+                colorScheme = colorScheme,
+                timeFormatter = timeFormatter,
+                onNicknameClick = onNicknameClick,
+                onMessageLongPress = onMessageLongPress,
+                onCancelTransfer = onCancelTransfer,
+                onImageClick = onImageClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+            return
+        }
+        ZemzemeMessageType.Audio -> {
+            com.roman.zemzeme.ui.media.AudioMessageItem(
+                message = message,
+                currentUserNickname = currentUserNickname,
+                meshService = meshService,
+                colorScheme = colorScheme,
+                timeFormatter = timeFormatter,
+                onNicknameClick = onNicknameClick,
+                onMessageLongPress = onMessageLongPress,
+                onCancelTransfer = onCancelTransfer,
+                modifier = Modifier.fillMaxWidth()
+            )
+            return
+        }
+        ZemzemeMessageType.File -> {
+            RenderFileMessage(
+                message = message,
+                currentUserNickname = currentUserNickname,
+                onCancelTransfer = onCancelTransfer
+            )
+            return
+        }
+        else -> {
+            // Text message - continue below
+        }
+    }
+
+    // Check if this message should be animated during PoW mining
+    val shouldAnimate = shouldAnimateMessage(message.id)
+
+    if (shouldAnimate) {
+        MessageWithMatrixAnimation(
+            message = message,
+            messages = messages,
+            currentUserNickname = currentUserNickname,
+            meshService = meshService,
+            colorScheme = colorScheme,
+            timeFormatter = timeFormatter,
+            onNicknameClick = onNicknameClick,
+            onMessageLongPress = onMessageLongPress,
+            onImageClick = onImageClick,
+            modifier = Modifier.fillMaxWidth()
+        )
+    } else {
+        // Normal text message
+        val annotatedText = formatMessageContentOnly(
+            message = message,
+            currentUserNickname = currentUserNickname,
+            colorScheme = colorScheme,
+            isSelf = isSelf
+        )
+
+        val haptic = LocalHapticFeedback.current
+        val context = LocalContext.current
+        var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+
+        Text(
+            text = annotatedText,
+            modifier = Modifier
+                .widthIn(max = 280.dp)
+                .wrapContentWidth()
+                .pointerInput(message) {
+                    detectTapGestures(
+                        onTap = { position ->
+                            val layout = textLayoutResult ?: return@detectTapGestures
+                            val offset = layout.getOffsetForPosition(position)
+
+                            // Geohash teleport
+                            val geohashAnnotations = annotatedText.getStringAnnotations(
+                                tag = "geohash_click",
+                                start = offset,
+                                end = offset
+                            )
+                            if (geohashAnnotations.isNotEmpty()) {
+                                val geohash = geohashAnnotations.first().item
+                                try {
+                                    val locationManager =
+                                        com.roman.zemzeme.geohash.LocationChannelManager.getInstance(
+                                            context
+                                        )
+                                    val level = when (geohash.length) {
+                                        in 0..2 -> com.roman.zemzeme.geohash.GeohashChannelLevel.REGION
+                                        in 3..4 -> com.roman.zemzeme.geohash.GeohashChannelLevel.PROVINCE
+                                        5 -> com.roman.zemzeme.geohash.GeohashChannelLevel.CITY
+                                        6 -> com.roman.zemzeme.geohash.GeohashChannelLevel.NEIGHBORHOOD
+                                        else -> com.roman.zemzeme.geohash.GeohashChannelLevel.BLOCK
+                                    }
+                                    val channel = com.roman.zemzeme.geohash.GeohashChannel(
+                                        level,
+                                        geohash.lowercase()
+                                    )
+                                    locationManager.setTeleported(true)
+                                    locationManager.select(
+                                        com.roman.zemzeme.geohash.ChannelID.Location(
+                                            channel
+                                        )
+                                    )
+                                } catch (_: Exception) {
+                                }
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                return@detectTapGestures
+                            }
+
+                            // URL open
+                            val urlAnnotations = annotatedText.getStringAnnotations(
+                                tag = "url_click",
+                                start = offset,
+                                end = offset
+                            )
+                            if (urlAnnotations.isNotEmpty()) {
+                                val raw = urlAnnotations.first().item
+                                val resolved =
+                                    if (raw.startsWith("http://", ignoreCase = true) || raw.startsWith(
+                                            "https://",
+                                            ignoreCase = true
+                                        )
+                                    ) raw else "https://$raw"
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(resolved))
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {
+                                }
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                return@detectTapGestures
+                            }
+                        },
+                        onLongPress = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onMessageLongPress?.invoke(message)
+                        }
+                    )
+                },
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            color = colorScheme.onSurface,
+            onTextLayout = { result -> textLayoutResult = result }
+        )
+    }
+}
+
+@Composable
+private fun RenderFileMessage(
+    message: ZemzemeMessage,
+    currentUserNickname: String,
+    onCancelTransfer: ((ZemzemeMessage) -> Unit)?
+) {
+    val path = message.content.trim()
+    val (overrideProgress, _) = when (val st = message.deliveryStatus) {
+        is com.roman.zemzeme.model.DeliveryStatus.PartiallyDelivered -> {
+            if (st.total > 0 && st.reached < st.total) {
+                (st.reached.toFloat() / st.total.toFloat()) to Color(0xFF1E88E5)
+            } else null to null
+        }
+        else -> null to null
+    }
+
+    val packet = try {
+        val file = java.io.File(path)
+        if (file.exists()) {
+            com.roman.zemzeme.model.ZemzemeFilePacket(
+                fileName = file.name,
+                fileSize = file.length(),
+                mimeType = com.roman.zemzeme.features.file.FileUtils.getMimeTypeFromExtension(file.name),
+                content = file.readBytes()
+            )
+        } else null
+    } catch (e: Exception) {
+        null
+    }
+
+    Box {
+        if (packet != null) {
+            if (overrideProgress != null) {
+                com.roman.zemzeme.ui.media.FileSendingAnimation(
+                    fileName = packet.fileName,
+                    progress = overrideProgress,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                FileMessageItem(
+                    packet = packet,
+                    onFileClick = {}
+                )
+            }
+
+            val showCancel = message.sender == currentUserNickname &&
+                    (message.deliveryStatus is DeliveryStatus.PartiallyDelivered)
+            if (showCancel) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(22.dp)
+                        .background(Color.Gray.copy(alpha = 0.6f), CircleShape)
+                        .clickable { onCancelTransfer?.invoke(message) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.cd_cancel),
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = stringResource(R.string.file_unavailable),
+                color = Color.Gray,
+                fontSize = 14.sp
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
     private fun MessageTextWithClickableNicknames(
-        message: BitchatMessage,
-        messages: List<BitchatMessage>,
+        message: ZemzemeMessage,
+        messages: List<ZemzemeMessage>,
         currentUserNickname: String,
         meshService: BluetoothMeshService,
         colorScheme: ColorScheme,
         timeFormatter: SimpleDateFormat,
         onNicknameClick: ((String) -> Unit)?,
-        onMessageLongPress: ((BitchatMessage) -> Unit)?,
-        onCancelTransfer: ((BitchatMessage) -> Unit)?,
+        onMessageLongPress: ((ZemzemeMessage) -> Unit)?,
+        onCancelTransfer: ((ZemzemeMessage) -> Unit)?,
         onImageClick: ((String, List<String>, Int) -> Unit)?,
         modifier: Modifier = Modifier
     ) {
     // Image special rendering
-    if (message.type == BitchatMessageType.Image) {
-        com.bitchat.android.ui.media.ImageMessageItem(
+    if (message.type == ZemzemeMessageType.Image) {
+        com.roman.zemzeme.ui.media.ImageMessageItem(
             message = message,
             messages = messages,
             currentUserNickname = currentUserNickname,
@@ -229,8 +649,8 @@ fun MessageItem(
     }
 
     // Voice note special rendering
-    if (message.type == BitchatMessageType.Audio) {
-        com.bitchat.android.ui.media.AudioMessageItem(
+    if (message.type == ZemzemeMessageType.Audio) {
+        com.roman.zemzeme.ui.media.AudioMessageItem(
             message = message,
             currentUserNickname = currentUserNickname,
             meshService = meshService,
@@ -245,11 +665,11 @@ fun MessageItem(
     }
 
     // File special rendering
-    if (message.type == BitchatMessageType.File) {
+    if (message.type == ZemzemeMessageType.File) {
         val path = message.content.trim()
         // Derive sending progress if applicable
         val (overrideProgress, _) = when (val st = message.deliveryStatus) {
-            is com.bitchat.android.model.DeliveryStatus.PartiallyDelivered -> {
+            is com.roman.zemzeme.model.DeliveryStatus.PartiallyDelivered -> {
                 if (st.total > 0 && st.reached < st.total) {
                     (st.reached.toFloat() / st.total.toFloat()) to Color(0xFF1E88E5) // blue while sending
                 } else null to null
@@ -289,12 +709,12 @@ fun MessageItem(
             val packet = try {
                 val file = java.io.File(path)
                 if (file.exists()) {
-                    // Create a temporary BitchatFilePacket for display
+                    // Create a temporary ZemzemeFilePacket for display
                     // In a real implementation, this would be stored with the packet metadata
-                    com.bitchat.android.model.BitchatFilePacket(
+                    com.roman.zemzeme.model.ZemzemeFilePacket(
                         fileName = file.name,
                         fileSize = file.length(),
-                        mimeType = com.bitchat.android.features.file.FileUtils.getMimeTypeFromExtension(file.name),
+                        mimeType = com.roman.zemzeme.features.file.FileUtils.getMimeTypeFromExtension(file.name),
                         content = file.readBytes()
                     )
                 } else null
@@ -307,7 +727,7 @@ fun MessageItem(
                     if (packet != null) {
                         if (overrideProgress != null) {
                             // Show sending animation while in-flight
-                            com.bitchat.android.ui.media.FileSendingAnimation(
+                            com.roman.zemzeme.ui.media.FileSendingAnimation(
                                 fileName = packet.fileName,
                                 progress = overrideProgress,
                                 modifier = Modifier.fillMaxWidth()
@@ -412,19 +832,19 @@ fun MessageItem(
                         if (geohashAnnotations.isNotEmpty()) {
                             val geohash = geohashAnnotations.first().item
                             try {
-                                val locationManager = com.bitchat.android.geohash.LocationChannelManager.getInstance(
+                                val locationManager = com.roman.zemzeme.geohash.LocationChannelManager.getInstance(
                                     context
                                 )
                                 val level = when (geohash.length) {
-                                    in 0..2 -> com.bitchat.android.geohash.GeohashChannelLevel.REGION
-                                    in 3..4 -> com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE
-                                    5 -> com.bitchat.android.geohash.GeohashChannelLevel.CITY
-                                    6 -> com.bitchat.android.geohash.GeohashChannelLevel.NEIGHBORHOOD
-                                    else -> com.bitchat.android.geohash.GeohashChannelLevel.BLOCK
+                                    in 0..2 -> com.roman.zemzeme.geohash.GeohashChannelLevel.REGION
+                                    in 3..4 -> com.roman.zemzeme.geohash.GeohashChannelLevel.PROVINCE
+                                    5 -> com.roman.zemzeme.geohash.GeohashChannelLevel.CITY
+                                    6 -> com.roman.zemzeme.geohash.GeohashChannelLevel.NEIGHBORHOOD
+                                    else -> com.roman.zemzeme.geohash.GeohashChannelLevel.BLOCK
                                 }
-                                val channel = com.bitchat.android.geohash.GeohashChannel(level, geohash.lowercase())
+                                val channel = com.roman.zemzeme.geohash.GeohashChannel(level, geohash.lowercase())
                                 locationManager.setTeleported(true)
-                                locationManager.select(com.bitchat.android.geohash.ChannelID.Location(channel))
+                                locationManager.select(com.roman.zemzeme.geohash.ChannelID.Location(channel))
                             } catch (_: Exception) { }
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             return@detectTapGestures

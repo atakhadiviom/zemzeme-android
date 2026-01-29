@@ -28,29 +28,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontFamily
 import com.roman.zemzeme.mesh.BluetoothMeshService
-import com.roman.zemzeme.model.BitchatMessage
-import com.roman.zemzeme.model.BitchatMessageType
+import com.roman.zemzeme.model.ZemzemeMessage
+import com.roman.zemzeme.model.ZemzemeMessageType
 import androidx.compose.material3.ColorScheme
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
 fun ImageMessageItem(
-    message: BitchatMessage,
-    messages: List<BitchatMessage>,
+    message: ZemzemeMessage,
+    messages: List<ZemzemeMessage>,
     currentUserNickname: String,
     meshService: BluetoothMeshService,
     colorScheme: ColorScheme,
     timeFormatter: SimpleDateFormat,
     onNicknameClick: ((String) -> Unit)?,
-    onMessageLongPress: ((BitchatMessage) -> Unit)?,
-    onCancelTransfer: ((BitchatMessage) -> Unit)?,
+    onMessageLongPress: ((ZemzemeMessage) -> Unit)?,
+    onCancelTransfer: ((ZemzemeMessage) -> Unit)?,
     onImageClick: ((String, List<String>, Int) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val path = message.content.trim()
     Column(modifier = modifier.fillMaxWidth()) {
-        val headerText = com.bitchat.android.ui.formatMessageHeaderAnnotatedString(
+        val headerText = com.roman.zemzeme.ui.formatMessageHeaderAnnotatedString(
             message = message,
             currentUserNickname = currentUserNickname,
             meshService = meshService,
@@ -82,7 +82,7 @@ fun ImageMessageItem(
 
         // Collect all image paths from messages for swipe navigation
         val imagePaths = remember(messages) {
-            messages.filter { it.type == BitchatMessageType.Image }
+            messages.filter { it.type == ZemzemeMessageType.Image }
                 .map { it.content.trim() }
         }
 
@@ -90,7 +90,7 @@ fun ImageMessageItem(
             val img = bmp.asImageBitmap()
             val aspect = (bmp.width.toFloat() / bmp.height.toFloat()).takeIf { it.isFinite() && it > 0 } ?: 1f
             val progressFraction: Float? = when (val st = message.deliveryStatus) {
-                is com.bitchat.android.model.DeliveryStatus.PartiallyDelivered -> if (st.total > 0) st.reached.toFloat() / st.total.toFloat() else 0f
+                is com.roman.zemzeme.model.DeliveryStatus.PartiallyDelivered -> if (st.total > 0) st.reached.toFloat() / st.total.toFloat() else 0f
                 else -> null
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
@@ -115,7 +115,7 @@ fun ImageMessageItem(
                         // Fully revealed image
                         Image(
                             bitmap = img,
-                            contentDescription = stringResource(com.bitchat.android.R.string.cd_image),
+                            contentDescription = stringResource(com.roman.zemzeme.R.string.cd_image),
                             modifier = Modifier
                                 .widthIn(max = 300.dp)
                                 .aspectRatio(aspect)
@@ -128,7 +128,7 @@ fun ImageMessageItem(
                         )
                     }
                     // Cancel button overlay during sending
-                    val showCancel = message.sender == currentUserNickname && (message.deliveryStatus is com.bitchat.android.model.DeliveryStatus.PartiallyDelivered)
+                    val showCancel = message.sender == currentUserNickname && (message.deliveryStatus is com.roman.zemzeme.model.DeliveryStatus.PartiallyDelivered)
                     if (showCancel) {
                         Box(
                             modifier = Modifier
@@ -139,13 +139,13 @@ fun ImageMessageItem(
                                 .clickable { onCancelTransfer?.invoke(message) },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Filled.Close, contentDescription = stringResource(com.bitchat.android.R.string.cd_cancel), tint = Color.White, modifier = Modifier.size(14.dp))
+                            Icon(imageVector = Icons.Filled.Close, contentDescription = stringResource(com.roman.zemzeme.R.string.cd_cancel), tint = Color.White, modifier = Modifier.size(14.dp))
                         }
                     }
                 }
             }
         } else {
-            Text(text = stringResource(com.bitchat.android.R.string.image_unavailable), fontFamily = FontFamily.Monospace, color = Color.Gray)
+            Text(text = stringResource(com.roman.zemzeme.R.string.image_unavailable), fontFamily = FontFamily.Monospace, color = Color.Gray)
         }
     }
 }

@@ -1,7 +1,7 @@
 package com.roman.zemzeme.mesh
 
 import android.util.Log
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import com.roman.zemzeme.protocol.SpecialRecipients
 import kotlinx.coroutines.*
@@ -16,17 +16,17 @@ class StoreForwardManager {
     
     companion object {
         private const val TAG = "StoreForwardManager"
-        private const val MESSAGE_CACHE_TIMEOUT = com.bitchat.android.util.AppConstants.StoreForward.MESSAGE_CACHE_TIMEOUT_MS  // 12 hours for regular peers
-        private const val MAX_CACHED_MESSAGES = com.bitchat.android.util.AppConstants.StoreForward.MAX_CACHED_MESSAGES  // For regular peers
-        private const val MAX_CACHED_MESSAGES_FAVORITES = com.bitchat.android.util.AppConstants.StoreForward.MAX_CACHED_MESSAGES_FAVORITES  // For favorites
-        private const val CLEANUP_INTERVAL = com.bitchat.android.util.AppConstants.StoreForward.CLEANUP_INTERVAL_MS // 10 minutes
+        private const val MESSAGE_CACHE_TIMEOUT = com.roman.zemzeme.util.AppConstants.StoreForward.MESSAGE_CACHE_TIMEOUT_MS  // 12 hours for regular peers
+        private const val MAX_CACHED_MESSAGES = com.roman.zemzeme.util.AppConstants.StoreForward.MAX_CACHED_MESSAGES  // For regular peers
+        private const val MAX_CACHED_MESSAGES_FAVORITES = com.roman.zemzeme.util.AppConstants.StoreForward.MAX_CACHED_MESSAGES_FAVORITES  // For favorites
+        private const val CLEANUP_INTERVAL = com.roman.zemzeme.util.AppConstants.StoreForward.CLEANUP_INTERVAL_MS // 10 minutes
     }
     
     /**
      * Data class for stored messages
      */
     private data class StoredMessage(
-        val packet: BitchatPacket,
+        val packet: ZemzemePacket,
         val timestamp: Long,
         val messageID: String,
         val isForFavorite: Boolean
@@ -51,7 +51,7 @@ class StoreForwardManager {
     /**
      * Cache message for offline delivery
      */
-    fun cacheMessage(packet: BitchatPacket, messageID: String) {
+    fun cacheMessage(packet: ZemzemePacket, messageID: String) {
         // Skip certain message types (same as iOS)
         if (packet.type == MessageType.NOISE_HANDSHAKE.value ||
             packet.type == MessageType.NOISE_ENCRYPTED.value ||
@@ -312,5 +312,5 @@ class StoreForwardManager {
 interface StoreForwardManagerDelegate {
     fun isFavorite(peerID: String): Boolean
     fun isPeerOnline(peerID: String): Boolean
-    fun sendPacket(packet: BitchatPacket)
+    fun sendPacket(packet: ZemzemePacket)
 }

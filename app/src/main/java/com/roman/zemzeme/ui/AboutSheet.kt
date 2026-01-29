@@ -33,13 +33,11 @@ import com.roman.zemzeme.nostr.PoWPreferenceManager
 import androidx.compose.ui.res.stringResource
 import com.roman.zemzeme.R
 import com.roman.zemzeme.core.ui.component.button.CloseButton
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
 import com.roman.zemzeme.net.TorMode
 import com.roman.zemzeme.net.TorPreferenceManager
 import com.roman.zemzeme.net.ArtiTorManager
 import com.roman.zemzeme.service.MeshServiceHolder
-import com.roman.zemzeme.update.UpdateManager
-import com.roman.zemzeme.update.UpdateState
 import com.roman.zemzeme.p2p.P2PConfig
 import com.roman.zemzeme.p2p.P2PTransport
 import com.roman.zemzeme.p2p.P2PNodeStatus
@@ -107,7 +105,7 @@ private fun ThemeChip(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
         color = if (selected) {
-            if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+            if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
         } else {
             colorScheme.surfaceVariant.copy(alpha = 0.5f)
         }
@@ -192,7 +190,7 @@ private fun SettingsToggleRow(
             enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D),
+                checkedTrackColor = if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D),
                 uncheckedThumbColor = Color.White,
                 uncheckedTrackColor = colorScheme.surfaceVariant
             )
@@ -238,7 +236,7 @@ fun AboutSheet(
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
     
     if (isPresented) {
-        BitchatBottomSheet(
+        ZemzemeBottomSheet(
             modifier = modifier,
             onDismissRequest = onDismiss,
         ) {
@@ -251,10 +249,6 @@ fun AboutSheet(
                 ) {
                     // Header Section - App Identity
                     item(key = "header") {
-                        // Observe update state for subtle indicator
-                        val updateManager = remember { UpdateManager.getInstance(context) }
-                        val updateState by updateManager.updateState.collectAsState()
-                        
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -272,78 +266,14 @@ fun AboutSheet(
                                 ),
                                 color = colorScheme.onBackground
                             )
-                            
-                            // Version with update status indicator
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.version_prefix, versionName ?: ""),
-                                    fontSize = 13.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = colorScheme.onBackground.copy(alpha = 0.5f)
-                                )
-                                
-                                // Subtle update status indicator
-                                when (updateState) {
-                                    is UpdateState.Downloading -> {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(12.dp),
-                                                strokeWidth = 1.5.dp,
-                                                color = Color(0xFFFF9500)
-                                            )
-                                            Text(
-                                                text = "updating...",
-                                                fontSize = 11.sp,
-                                                fontFamily = FontFamily.Monospace,
-                                                color = Color(0xFFFF9500)
-                                            )
-                                        }
-                                    }
-                                    is UpdateState.Installing -> {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(12.dp),
-                                                strokeWidth = 1.5.dp,
-                                                color = Color(0xFF5AC8FA)
-                                            )
-                                            Text(
-                                                text = "installing...",
-                                                fontSize = 11.sp,
-                                                fontFamily = FontFamily.Monospace,
-                                                color = Color(0xFF5AC8FA)
-                                            )
-                                        }
-                                    }
-                                    is UpdateState.PendingUserAction -> {
-                                        Text(
-                                            text = "tap to confirm",
-                                            fontSize = 11.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFFFF9500)
-                                        )
-                                    }
-                                    is UpdateState.Success -> {
-                                        Text(
-                                            text = "restart to apply",
-                                            fontSize = 11.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFF00C851)
-                                        )
-                                    }
-                                    else -> {
-                                        // Idle or Error - no indicator shown
-                                    }
-                                }
-                            }
+
+                            // Version
+                            Text(
+                                text = stringResource(R.string.version_prefix, versionName ?: ""),
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = colorScheme.onBackground.copy(alpha = 0.5f)
+                            )
                             Text(
                                 text = stringResource(R.string.about_tagline),
                                 fontSize = 13.sp,
@@ -408,7 +338,7 @@ fun AboutSheet(
                                 letterSpacing = 0.5.sp,
                                 modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
                             )
-                            val themePref by com.bitchat.android.ui.theme.ThemePreferenceManager.themeFlow.collectAsState()
+                            val themePref by com.roman.zemzeme.ui.theme.ThemePreferenceManager.themeFlow.collectAsState()
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = colorScheme.surface,
@@ -423,19 +353,19 @@ fun AboutSheet(
                                     ThemeChip(
                                         label = stringResource(R.string.about_system),
                                         selected = themePref.isSystem,
-                                        onClick = { com.bitchat.android.ui.theme.ThemePreferenceManager.set(context, com.bitchat.android.ui.theme.ThemePreference.System) },
+                                        onClick = { com.roman.zemzeme.ui.theme.ThemePreferenceManager.set(context, com.roman.zemzeme.ui.theme.ThemePreference.System) },
                                         modifier = Modifier.weight(1f)
                                     )
                                     ThemeChip(
                                         label = stringResource(R.string.about_light),
                                         selected = themePref.isLight,
-                                        onClick = { com.bitchat.android.ui.theme.ThemePreferenceManager.set(context, com.bitchat.android.ui.theme.ThemePreference.Light) },
+                                        onClick = { com.roman.zemzeme.ui.theme.ThemePreferenceManager.set(context, com.roman.zemzeme.ui.theme.ThemePreference.Light) },
                                         modifier = Modifier.weight(1f)
                                     )
                                     ThemeChip(
                                         label = stringResource(R.string.about_dark),
                                         selected = themePref.isDark,
-                                        onClick = { com.bitchat.android.ui.theme.ThemePreferenceManager.set(context, com.bitchat.android.ui.theme.ThemePreference.Dark) },
+                                        onClick = { com.roman.zemzeme.ui.theme.ThemePreferenceManager.set(context, com.roman.zemzeme.ui.theme.ThemePreference.Dark) },
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -448,7 +378,7 @@ fun AboutSheet(
                         LaunchedEffect(Unit) { PoWPreferenceManager.init(context) }
                         val powEnabled by PoWPreferenceManager.powEnabled.collectAsState()
                         val powDifficulty by PoWPreferenceManager.powDifficulty.collectAsState()
-                        var backgroundEnabled by remember { mutableStateOf(com.bitchat.android.service.MeshServicePreferences.isBackgroundEnabled(true)) }
+                        var backgroundEnabled by remember { mutableStateOf(com.roman.zemzeme.service.MeshServicePreferences.isBackgroundEnabled(true)) }
                         val torMode by TorPreferenceManager.modeFlow.collectAsState()
                         val torProvider = remember { ArtiTorManager.getInstance() }
                         val torStatus by torProvider.statusFlow.collectAsState()
@@ -456,7 +386,7 @@ fun AboutSheet(
                         val p2pConfig = remember { P2PConfig(context) }
                         val transportToggles by P2PConfig.transportTogglesFlow.collectAsState()
                         val attachedMeshService by MeshServiceHolder.meshServiceFlow.collectAsState()
-                        val transportRuntimeState by produceState<com.bitchat.android.mesh.BluetoothMeshService.TransportRuntimeState?>(
+                        val transportRuntimeState by produceState<com.roman.zemzeme.mesh.BluetoothMeshService.TransportRuntimeState?>(
                             initialValue = attachedMeshService?.transportRuntimeState?.value,
                             key1 = attachedMeshService
                         ) {
@@ -498,11 +428,11 @@ fun AboutSheet(
                                         checked = backgroundEnabled,
                                         onCheckedChange = { enabled ->
                                             backgroundEnabled = enabled
-                                            com.bitchat.android.service.MeshServicePreferences.setBackgroundEnabled(enabled)
+                                            com.roman.zemzeme.service.MeshServicePreferences.setBackgroundEnabled(enabled)
                                             if (!enabled) {
-                                                com.bitchat.android.service.MeshForegroundService.stop(context)
+                                                com.roman.zemzeme.service.MeshForegroundService.stop(context)
                                             } else {
-                                                com.bitchat.android.service.MeshForegroundService.start(context)
+                                                com.roman.zemzeme.service.MeshForegroundService.start(context)
                                             }
                                         }
                                     )
@@ -554,7 +484,7 @@ fun AboutSheet(
                                         statusIndicator = if (torMode == TorMode.ON) {
                                             {
                                                 val statusColor = when {
-                                                    torStatus.running && torStatus.bootstrapPercent >= 100 -> if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                                    torStatus.running && torStatus.bootstrapPercent >= 100 -> if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
                                                     torStatus.running -> Color(0xFFFF9500)
                                                     else -> Color(0xFFFF3B30)
                                                 }
@@ -577,7 +507,7 @@ fun AboutSheet(
                                     SettingsToggleRow(
                                         icon = Icons.Filled.Wifi,
                                         title = "P2P Network",
-                                        subtitle = "Direct peer connections via libp2p",
+                                        subtitle = stringResource(R.string.about_p2p_subtitle),
                                         checked = p2pEnabled,
                                         onCheckedChange = { enabled ->
                                             if (enabled && torMode == TorMode.ON) {
@@ -602,8 +532,8 @@ fun AboutSheet(
                                                     // Fallback path when mesh service is not attached
                                                     if (enabled) {
                                                         // P2P and Nostr are mutually exclusive.
-                                                        com.bitchat.android.nostr.NostrRelayManager.isEnabled = false
-                                                        com.bitchat.android.nostr.NostrRelayManager.getInstance(context).disconnect()
+                                                        com.roman.zemzeme.nostr.NostrRelayManager.isEnabled = false
+                                                        com.roman.zemzeme.nostr.NostrRelayManager.getInstance(context).disconnect()
                                                         p2pTransport.start().onFailure { fallbackError ->
                                                             android.util.Log.e("AboutSheet", "P2P fallback start failed: ${fallbackError.message}")
                                                         }
@@ -616,7 +546,7 @@ fun AboutSheet(
                                         statusIndicator = if (p2pEnabled) {
                                             {
                                                 val statusColor = when {
-                                                    p2pRunning -> if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                                    p2pRunning -> if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
                                                     p2pStatus == P2PNodeStatus.STARTING -> Color(0xFFFF9500)
                                                     else -> Color(0xFFFF3B30)
                                                 }
@@ -635,14 +565,14 @@ fun AboutSheet(
                                     )
                                     
                                     // Nostr Network Toggle (for testing P2P in isolation)
-                                    val nostrRelayManager = remember { com.bitchat.android.nostr.NostrRelayManager.getInstance(context) }
+                                    val nostrRelayManager = remember { com.roman.zemzeme.nostr.NostrRelayManager.getInstance(context) }
                                     val nostrConnected by nostrRelayManager.isConnected.collectAsState()
                                     val effectiveNostrConnected = transportRuntimeState?.nostrConnected ?: nostrConnected
                                     
                                     SettingsToggleRow(
                                         icon = Icons.Filled.Cloud,
                                         title = "Nostr Relays",
-                                        subtitle = "Internet relay messaging",
+                                        subtitle = stringResource(R.string.about_nostr_subtitle),
                                         checked = nostrEnabled,
                                         onCheckedChange = { enabled ->
                                             p2pConfig.nostrEnabled = enabled
@@ -657,10 +587,10 @@ fun AboutSheet(
                                                     // Fallback path when mesh service is not attached
                                                     if (enabled) {
                                                         p2pTransport.stop()
-                                                        com.bitchat.android.nostr.NostrRelayManager.isEnabled = true
+                                                        com.roman.zemzeme.nostr.NostrRelayManager.isEnabled = true
                                                         nostrRelayManager.connect()
                                                     } else {
-                                                        com.bitchat.android.nostr.NostrRelayManager.isEnabled = false
+                                                        com.roman.zemzeme.nostr.NostrRelayManager.isEnabled = false
                                                         nostrRelayManager.disconnect()
                                                     }
                                                 }
@@ -670,7 +600,7 @@ fun AboutSheet(
                                         statusIndicator = if (nostrEnabled) {
                                             {
                                                 val statusColor = if (effectiveNostrConnected) {
-                                                    if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                                    if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
                                                 } else {
                                                     Color(0xFFFF9500)
                                                 }
@@ -694,7 +624,7 @@ fun AboutSheet(
                                     SettingsToggleRow(
                                         icon = Icons.Filled.Bluetooth,
                                         title = "BLE Mesh",
-                                        subtitle = "Bluetooth proximity mesh",
+                                        subtitle = stringResource(R.string.about_ble_subtitle),
                                         checked = bleEnabled,
                                         onCheckedChange = { enabled ->
                                             p2pConfig.bleEnabled = enabled
@@ -716,7 +646,7 @@ fun AboutSheet(
                                         statusIndicator = if (bleEnabled) {
                                             {
                                                 val statusColor = if (bleRunning) {
-                                                    if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                                    if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
                                                 } else {
                                                     Color(0xFFFF9500)
                                                 }
@@ -785,8 +715,8 @@ fun AboutSheet(
                                             valueRange = 0f..32f,
                                             steps = 31,
                                             colors = SliderDefaults.colors(
-                                                thumbColor = if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D),
-                                                activeTrackColor = if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                                thumbColor = if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D),
+                                                activeTrackColor = if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
                                             )
                                         )
                                         
@@ -832,7 +762,7 @@ fun AboutSheet(
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             val statusColor = when {
-                                                torStatus.running && torStatus.bootstrapPercent >= 100 -> if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                                torStatus.running && torStatus.bootstrapPercent >= 100 -> if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
                                                 torStatus.running -> Color(0xFFFF9500)
                                                 else -> Color(0xFFFF3B30)
                                             }

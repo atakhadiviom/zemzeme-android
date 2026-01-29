@@ -1,6 +1,6 @@
 package com.roman.zemzeme.sync
 
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import java.security.MessageDigest
 
 /**
@@ -10,7 +10,7 @@ import java.security.MessageDigest
  * Returns a 16-byte (128-bit) truncated hash for compactness.
  */
 object PacketIdUtil {
-    fun computeIdBytes(packet: BitchatPacket): ByteArray {
+    fun computeIdBytes(packet: ZemzemePacket): ByteArray {
         val md = MessageDigest.getInstance("SHA-256")
         md.update(packet.type.toByte())
         md.update(packet.senderID)
@@ -24,7 +24,7 @@ object PacketIdUtil {
         return digest.copyOf(16) // 128-bit ID
     }
 
-    fun computeIdHex(packet: BitchatPacket): String {
+    fun computeIdHex(packet: ZemzemePacket): String {
         return computeIdBytes(packet).joinToString("") { b -> "%02x".format(b) }
     }
 }

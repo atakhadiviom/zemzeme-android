@@ -53,7 +53,7 @@ class LocationChannelManager private constructor(private val context: Context) {
     private var lastLocation: Location? = null
     private var geocodingJob: Job? = null
     private val gson = Gson()
-    private var dataManager: com.bitchat.android.ui.DataManager? = null
+    private var dataManager: com.roman.zemzeme.ui.DataManager? = null
 
     private fun checkSystemLocationEnabled(): Boolean {
         return try {
@@ -130,7 +130,7 @@ class LocationChannelManager private constructor(private val context: Context) {
 
         checkAndSyncPermission()
         // Initialize DataManager and load persisted settings
-        dataManager = com.bitchat.android.ui.DataManager(context)
+        dataManager = com.roman.zemzeme.ui.DataManager(context)
         loadPersistedChannelSelection()
         loadLocationServicesState()
 

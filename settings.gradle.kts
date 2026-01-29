@@ -15,6 +15,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "zemzeme"
+rootProject.name = "zemzeme-android"
 include(":app")
 // Using published Arti AAR; local module not included

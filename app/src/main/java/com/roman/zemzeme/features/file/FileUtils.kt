@@ -193,7 +193,7 @@ object FileUtils {
      */
     fun saveIncomingFile(
         context: Context,
-        file: com.bitchat.android.model.BitchatFilePacket
+        file: com.roman.zemzeme.model.ZemzemeFilePacket
     ): String {
         val lowerMime = file.mimeType.lowercase()
         val isImage = lowerMime.startsWith("image/")
@@ -263,14 +263,14 @@ object FileUtils {
     }
 
     /**
-     * Classify BitchatMessageType from MIME string used in file messages.
+     * Classify ZemzemeMessageType from MIME string used in file messages.
      */
-    fun messageTypeForMime(mime: String): com.bitchat.android.model.BitchatMessageType {
+    fun messageTypeForMime(mime: String): com.roman.zemzeme.model.ZemzemeMessageType {
         val lower = mime.lowercase()
         return when {
-            lower.startsWith("image/") -> com.bitchat.android.model.BitchatMessageType.Image
-            lower.startsWith("audio/") -> com.bitchat.android.model.BitchatMessageType.Audio
-            else -> com.bitchat.android.model.BitchatMessageType.File
+            lower.startsWith("image/") -> com.roman.zemzeme.model.ZemzemeMessageType.Image
+            lower.startsWith("audio/") -> com.roman.zemzeme.model.ZemzemeMessageType.Audio
+            else -> com.roman.zemzeme.model.ZemzemeMessageType.File
         }
     }
 

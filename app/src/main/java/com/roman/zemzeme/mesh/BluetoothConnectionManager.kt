@@ -4,7 +4,7 @@ import android.bluetooth.*
 import android.content.Context
 import android.util.Log
 import com.roman.zemzeme.model.RoutedPacket
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
@@ -42,7 +42,7 @@ class BluetoothConnectionManager(
     
     // Delegate for component managers to call back to main manager
     private val componentDelegate = object : BluetoothConnectionManagerDelegate {
-        override fun onPacketReceived(packet: BitchatPacket, peerID: String, device: BluetoothDevice?) {
+        override fun onPacketReceived(packet: ZemzemePacket, peerID: String, device: BluetoothDevice?) {
             Log.d(TAG, "onPacketReceived: Packet received from ${device?.address} ($peerID)")
             device?.let { bluetoothDevice ->
                 // Get current RSSI for this device and update if available
@@ -92,7 +92,7 @@ class BluetoothConnectionManager(
         powerManager.delegate = this
         // Observe debug settings to enforce role state while active
         try {
-            val dbg = com.bitchat.android.ui.debug.DebugSettingsManager.getInstance()
+            val dbg = com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance()
             // Role enable/disable
             connectionScope.launch {
                 dbg.gattServerEnabled.collect { enabled ->
@@ -132,7 +132,7 @@ class BluetoothConnectionManager(
         if (!isActive) return
         
         try {
-            val dbg = com.bitchat.android.ui.debug.DebugSettingsManager.getInstance()
+            val dbg = com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance()
             val maxOverall = dbg.maxConnectionsOverall.value
             val maxServer = dbg.maxServerConnections.value
             val maxClient = dbg.maxClientConnections.value
@@ -197,7 +197,7 @@ class BluetoothConnectionManager(
                 powerManager.start()
                 
                 // Start server/client based on debug settings
-                val dbg = try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance() } catch (_: Exception) { null }
+                val dbg = try { com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance() } catch (_: Exception) { null }
                 val startServer = dbg?.gattServerEnabled?.value != false
                 val startClient = dbg?.gattClientEnabled?.value != false
 
@@ -310,7 +310,7 @@ class BluetoothConnectionManager(
     /**
      * Send a packet directly to a specific peer, without broadcasting to others.
      */
-    fun sendPacketToPeer(peerID: String, packet: BitchatPacket): Boolean {
+    fun sendPacketToPeer(peerID: String, packet: ZemzemePacket): Boolean {
         if (!isActive) return false
         return packetBroadcaster.sendPacketToPeer(
             RoutedPacket(packet),
@@ -405,7 +405,7 @@ class BluetoothConnectionManager(
             val wasUsingDutyCycle = powerManager.shouldUseDutyCycle()
             
             // Update advertising with new power settings if server enabled
-            val serverEnabled = try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().gattServerEnabled.value } catch (_: Exception) { true }
+            val serverEnabled = try { com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance().gattServerEnabled.value } catch (_: Exception) { true }
             if (serverEnabled) {
                 serverManager.restartAdvertising()
             } else {
@@ -416,7 +416,7 @@ class BluetoothConnectionManager(
             val nowUsingDutyCycle = powerManager.shouldUseDutyCycle()
             if (wasUsingDutyCycle != nowUsingDutyCycle) {
                 Log.d(TAG, "Duty cycle behavior changed (${wasUsingDutyCycle} -> ${nowUsingDutyCycle}), restarting scan")
-                val clientEnabled = try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
+                val clientEnabled = try { com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
                 if (clientEnabled) {
                     clientManager.restartScanning()
                 } else {
@@ -442,7 +442,7 @@ class BluetoothConnectionManager(
  * Delegate interface for Bluetooth connection manager callbacks
  */
 interface BluetoothConnectionManagerDelegate {
-    fun onPacketReceived(packet: BitchatPacket, peerID: String, device: BluetoothDevice?)
+    fun onPacketReceived(packet: ZemzemePacket, peerID: String, device: BluetoothDevice?)
     fun onDeviceConnected(device: BluetoothDevice)
     fun onDeviceDisconnected(device: BluetoothDevice)
     fun onRSSIUpdated(deviceAddress: String, rssi: Int)

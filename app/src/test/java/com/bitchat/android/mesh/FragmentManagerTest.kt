@@ -1,6 +1,6 @@
 package com.roman.zemzeme.mesh
 
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import com.roman.zemzeme.model.FragmentPayload
 import org.junit.Assert.assertEquals
@@ -30,7 +30,7 @@ class FragmentManagerTest {
         val payload = ByteArray(1000)
         Random().nextBytes(payload)
 
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             version = 1u,
             type = MessageType.MESSAGE.value,
             senderID = hexStringToByteArray(senderID),
@@ -69,7 +69,7 @@ class FragmentManagerTest {
             hexStringToByteArray("1234567890ABCDEF")
         )
 
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             version = 2u,
             type = MessageType.MESSAGE.value,
             senderID = hexStringToByteArray(senderID),
@@ -103,7 +103,7 @@ class FragmentManagerTest {
         Random().nextBytes(payload)
         
         // 1. Without route
-        val packetNoRoute = BitchatPacket(
+        val packetNoRoute = ZemzemePacket(
             version = 1u,
             type = MessageType.MESSAGE.value,
             senderID = hexStringToByteArray(senderID),
@@ -119,7 +119,7 @@ class FragmentManagerTest {
         
         // 2. With large route (e.g., 5 hops)
         val route = List(5) { hexStringToByteArray("000000000000000$it") }
-        val packetWithRoute = BitchatPacket(
+        val packetWithRoute = ZemzemePacket(
             version = 2u,
             type = MessageType.MESSAGE.value,
             senderID = hexStringToByteArray(senderID),
@@ -150,7 +150,7 @@ class FragmentManagerTest {
         val originalPayload = ByteArray(1500)
         Random().nextBytes(originalPayload)
         
-        val originalPacket = BitchatPacket(
+        val originalPacket = ZemzemePacket(
             version = 1u,
             type = MessageType.FILE_TRANSFER.value,
             senderID = hexStringToByteArray(senderID),
@@ -162,7 +162,7 @@ class FragmentManagerTest {
         
         val fragments = fragmentManager.createFragments(originalPacket)
         
-        var reassembledPacket: BitchatPacket? = null
+        var reassembledPacket: ZemzemePacket? = null
         
         // Feed fragments back into FragmentManager
         // Note: FragmentManager stores state in incomingFragments

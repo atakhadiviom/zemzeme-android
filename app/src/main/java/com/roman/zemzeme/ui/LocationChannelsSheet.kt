@@ -38,9 +38,9 @@ import com.roman.zemzeme.ui.theme.BASE_FONT_SIZE
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roman.zemzeme.R
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTopBar
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTitle
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetTopBar
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetTitle
 
 /**
  * Location Channels Sheet for selecting geohash-based location channels
@@ -112,11 +112,11 @@ fun LocationChannelsSheet(
     // iOS system colors (matches iOS exactly)
     val colorScheme = MaterialTheme.colorScheme
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
-    val standardGreen = if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D) // iOS green
+    val standardGreen = if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D) // iOS green
     val standardBlue = Color(0xFF007AFF) // iOS blue
 
     if (isPresented) {
-        BitchatBottomSheet(
+        ZemzemeBottomSheet(
             modifier = modifier,
             onDismissRequest = onDismiss,
             sheetState = sheetState,
@@ -508,11 +508,11 @@ fun LocationChannelsSheet(
                 }
 
                 // TopBar (animated)
-                BitchatSheetTopBar(
+                ZemzemeSheetTopBar(
                     onClose = onDismiss,
                     modifier = modifier.align(Alignment.TopCenter),
                     title = {
-                        BitchatSheetTitle(
+                        ZemzemeSheetTitle(
                             text = stringResource(R.string.location_channels_title)
                         )
                     }
@@ -613,7 +613,7 @@ private fun ChannelRow(
                     Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = stringResource(R.string.cd_selected),
-                        tint = Color(0xFF32D74B), // iOS green for checkmark
+                        tint = Color(0xFF00F5FF), // iOS green for checkmark
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -643,8 +643,8 @@ private fun splitTitleAndCount(title: String): Pair<String, String?> {
 private fun meshTitleWithCount(viewModel: ChatViewModel): String {
     val meshCount = meshCount(viewModel)
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val peopleText = ctx.resources.getQuantityString(com.bitchat.android.R.plurals.people_count, meshCount, meshCount)
-    val meshLabel = stringResource(com.bitchat.android.R.string.mesh_label)
+    val peopleText = ctx.resources.getQuantityString(com.roman.zemzeme.R.plurals.people_count, meshCount, meshCount)
+    val meshLabel = stringResource(com.roman.zemzeme.R.string.mesh_label)
     return "$meshLabel [$peopleText]"
 }
 
@@ -663,18 +663,18 @@ private fun geohashTitleWithCount(channel: GeohashChannel, participantCount: Int
     // show "? people" instead of "0 people" to avoid misleading "nobody is here" indication.
     val isHighPrecision = channel.level.precision > 5
     val peopleText = if (isHighPrecision && participantCount == 0) {
-        ctx.resources.getQuantityString(com.bitchat.android.R.plurals.people_count, 0, 0).replace("0", "?")
+        ctx.resources.getQuantityString(com.roman.zemzeme.R.plurals.people_count, 0, 0).replace("0", "?")
     } else {
-        ctx.resources.getQuantityString(com.bitchat.android.R.plurals.people_count, participantCount, participantCount)
+        ctx.resources.getQuantityString(com.roman.zemzeme.R.plurals.people_count, participantCount, participantCount)
     }
 
     val levelName = when (channel.level) {
-        com.bitchat.android.geohash.GeohashChannelLevel.BUILDING -> "Building" // iOS: precision 8 for location notes
-        com.bitchat.android.geohash.GeohashChannelLevel.BLOCK -> stringResource(com.bitchat.android.R.string.location_level_block)
-        com.bitchat.android.geohash.GeohashChannelLevel.NEIGHBORHOOD -> stringResource(com.bitchat.android.R.string.location_level_neighborhood)
-        com.bitchat.android.geohash.GeohashChannelLevel.CITY -> stringResource(com.bitchat.android.R.string.location_level_city)
-        com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE -> stringResource(com.bitchat.android.R.string.location_level_province)
-        com.bitchat.android.geohash.GeohashChannelLevel.REGION -> stringResource(com.bitchat.android.R.string.location_level_region)
+        com.roman.zemzeme.geohash.GeohashChannelLevel.BUILDING -> "Building" // iOS: precision 8 for location notes
+        com.roman.zemzeme.geohash.GeohashChannelLevel.BLOCK -> stringResource(com.roman.zemzeme.R.string.location_level_block)
+        com.roman.zemzeme.geohash.GeohashChannelLevel.NEIGHBORHOOD -> stringResource(com.roman.zemzeme.R.string.location_level_neighborhood)
+        com.roman.zemzeme.geohash.GeohashChannelLevel.CITY -> stringResource(com.roman.zemzeme.R.string.location_level_city)
+        com.roman.zemzeme.geohash.GeohashChannelLevel.PROVINCE -> stringResource(com.roman.zemzeme.R.string.location_level_province)
+        com.roman.zemzeme.geohash.GeohashChannelLevel.REGION -> stringResource(com.roman.zemzeme.R.string.location_level_region)
     }
     return "$levelName [$peopleText]"
 }
@@ -686,9 +686,9 @@ private fun geohashHashTitleWithCount(geohash: String, participantCount: Int): S
     val isHighPrecision = level.precision > 5
 
     val peopleText = if (isHighPrecision && participantCount == 0) {
-        ctx.resources.getQuantityString(com.bitchat.android.R.plurals.people_count, 0, 0).replace("0", "?")
+        ctx.resources.getQuantityString(com.roman.zemzeme.R.plurals.people_count, 0, 0).replace("0", "?")
     } else {
-        ctx.resources.getQuantityString(com.bitchat.android.R.plurals.people_count, participantCount, participantCount)
+        ctx.resources.getQuantityString(com.roman.zemzeme.R.plurals.people_count, participantCount, participantCount)
     }
     
     return "#$geohash [$peopleText]"

@@ -1,11 +1,11 @@
 package com.roman.zemzeme.mesh
 
 import android.util.Log
-import com.roman.zemzeme.model.BitchatMessage
-import com.roman.zemzeme.model.BitchatMessageType
+import com.roman.zemzeme.model.ZemzemeMessage
+import com.roman.zemzeme.model.ZemzemeMessageType
 import com.roman.zemzeme.model.IdentityAnnouncement
 import com.roman.zemzeme.model.RoutedPacket
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import com.roman.zemzeme.util.toHexString
 import kotlinx.coroutines.*
@@ -39,7 +39,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
         
-        Log.d(TAG, "Processing Noise encrypted message from $peerID (${packet.payload.size} bytes)")
+        Log.i(TAG, "Processing Noise encrypted message from $peerID (${packet.payload.size} bytes)")
         
         // Skip our own messages
         if (peerID == myPeerID) return
@@ -47,7 +47,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         // Check if this message is for us
         val recipientID = packet.recipientID?.toHexString()
         if (recipientID != myPeerID) {
-            Log.d(TAG, "🔐 Encrypted message not for me (for $recipientID, I am $myPeerID)")
+            Log.i(TAG, "🔐 Encrypted message not for me (for $recipientID, I am $myPeerID)")
             return
         }
         
@@ -65,20 +65,20 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             }
             
             // NEW: Use NoisePayload system exactly like iOS
-            val noisePayload = com.bitchat.android.model.NoisePayload.decode(decryptedData)
+            val noisePayload = com.roman.zemzeme.model.NoisePayload.decode(decryptedData)
             if (noisePayload == null) {
                 Log.w(TAG, "Failed to parse NoisePayload from $peerID")
                 return
             }
             
-            Log.d(TAG, "🔓 Decrypted NoisePayload type ${noisePayload.type} from $peerID")
+            Log.i(TAG, "🔓 Decrypted NoisePayload type ${noisePayload.type} from $peerID")
             
             when (noisePayload.type) {
-                com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE -> {
+                com.roman.zemzeme.model.NoisePayloadType.PRIVATE_MESSAGE -> {
                     // Decode TLV private message exactly like iOS
-                    val privateMessage = com.bitchat.android.model.PrivateMessagePacket.decode(noisePayload.data)
+                    val privateMessage = com.roman.zemzeme.model.PrivateMessagePacket.decode(noisePayload.data)
                     if (privateMessage != null) {
-                        Log.d(TAG, "🔓 Decrypted TLV PM from $peerID: ${privateMessage.content.take(30)}...")
+                        Log.i(TAG, "🔓 Decrypted TLV PM from $peerID: ${privateMessage.content.take(30)}...")
 
                         // Handle favorite/unfavorite notifications embedded as PMs
                         val pmContent = privateMessage.content
@@ -89,8 +89,8 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                             return
                         }
                         
-                        // Create BitchatMessage - preserve source packet timestamp
-                        val message = BitchatMessage(
+                        // Create ZemzemeMessage - preserve source packet timestamp
+                        val message = ZemzemeMessage(
                             id = privateMessage.messageID,
                             sender = delegate?.getPeerNickname(peerID) ?: "Unknown",
                             content = privateMessage.content,
@@ -111,18 +111,18 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     }
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.FILE_TRANSFER -> {
+                com.roman.zemzeme.model.NoisePayloadType.FILE_TRANSFER -> {
                     // Handle encrypted file transfer; generate unique message ID
-                    val file = com.bitchat.android.model.BitchatFilePacket.decode(noisePayload.data)
+                    val file = com.roman.zemzeme.model.ZemzemeFilePacket.decode(noisePayload.data)
                     if (file != null) {
-                        Log.d(TAG, "🔓 Decrypted encrypted file from $peerID: name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}'")
+                        Log.i(TAG, "🔓 Decrypted encrypted file from $peerID: name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}'")
                         val uniqueMsgId = java.util.UUID.randomUUID().toString().uppercase()
-                        val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(appContext, file)
-                        val message = BitchatMessage(
+                        val savedPath = com.roman.zemzeme.features.file.FileUtils.saveIncomingFile(appContext, file)
+                        val message = ZemzemeMessage(
                             id = uniqueMsgId,
                             sender = delegate?.getPeerNickname(peerID) ?: "Unknown",
                             content = savedPath,
-                            type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
+                            type = com.roman.zemzeme.features.file.FileUtils.messageTypeForMime(file.mimeType),
                             timestamp = java.util.Date(packet.timestamp.toLong()),
                             isRelay = false,
                             isPrivate = true,
@@ -130,7 +130,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                             senderPeerID = peerID
                         )
 
-                        Log.d(TAG, "📄 Saved encrypted incoming file to $savedPath (msgId=$uniqueMsgId)")
+                        Log.i(TAG, "📄 Saved encrypted incoming file to $savedPath (msgId=$uniqueMsgId)")
                         delegate?.onMessageReceived(message)
 
                         // Send delivery ACK with generated message ID
@@ -140,29 +140,29 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     }
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.DELIVERED -> {
+                com.roman.zemzeme.model.NoisePayloadType.DELIVERED -> {
                     // Handle delivery ACK exactly like iOS
                     val messageID = String(noisePayload.data, Charsets.UTF_8)
-                    Log.d(TAG, "📬 Delivery ACK received from $peerID for message $messageID")
+                    Log.i(TAG, "📬 Delivery ACK received from $peerID for message $messageID")
                     
                     // Simplified: Call delegate with messageID and peerID directly
                     delegate?.onDeliveryAckReceived(messageID, peerID)
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.READ_RECEIPT -> {
+                com.roman.zemzeme.model.NoisePayloadType.READ_RECEIPT -> {
                     // Handle read receipt exactly like iOS
                     val messageID = String(noisePayload.data, Charsets.UTF_8)
-                    Log.d(TAG, "👁️ Read receipt received from $peerID for message $messageID")
+                    Log.i(TAG, "👁️ Read receipt received from $peerID for message $messageID")
                     
                     // Simplified: Call delegate with messageID and peerID directly
                     delegate?.onReadReceiptReceived(messageID, peerID)
                 }
-                com.bitchat.android.model.NoisePayloadType.VERIFY_CHALLENGE -> {
-                    Log.d(TAG, "🔐 Verify challenge received from $peerID (${noisePayload.data.size} bytes)")
+                com.roman.zemzeme.model.NoisePayloadType.VERIFY_CHALLENGE -> {
+                    Log.i(TAG, "🔐 Verify challenge received from $peerID (${noisePayload.data.size} bytes)")
                     delegate?.onVerifyChallengeReceived(peerID, noisePayload.data, packet.timestamp.toLong())
                 }
-                com.bitchat.android.model.NoisePayloadType.VERIFY_RESPONSE -> {
-                    Log.d(TAG, "🔐 Verify response received from $peerID (${noisePayload.data.size} bytes)")
+                com.roman.zemzeme.model.NoisePayloadType.VERIFY_RESPONSE -> {
+                    Log.i(TAG, "🔐 Verify response received from $peerID (${noisePayload.data.size} bytes)")
                     delegate?.onVerifyResponseReceived(peerID, noisePayload.data, packet.timestamp.toLong())
                 }
             }
@@ -178,8 +178,8 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
     private suspend fun sendDeliveryAck(messageID: String, senderPeerID: String) {
         try {
             // Create ACK payload: [type byte] + [message ID] - exactly like iOS
-            val ackPayload = com.bitchat.android.model.NoisePayload(
-                type = com.bitchat.android.model.NoisePayloadType.DELIVERED,
+            val ackPayload = com.roman.zemzeme.model.NoisePayload(
+                type = com.roman.zemzeme.model.NoisePayloadType.DELIVERED,
                 data = messageID.toByteArray(Charsets.UTF_8)
             )
             
@@ -191,7 +191,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             }
             
             // Create NOISE_ENCRYPTED packet exactly like iOS
-                val packet = BitchatPacket(
+                val packet = ZemzemePacket(
                     version = 1u,
                     type = MessageType.NOISE_ENCRYPTED.value,
                     senderID = hexStringToByteArray(myPeerID),
@@ -199,11 +199,11 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     timestamp = System.currentTimeMillis().toULong(),
                     payload = encryptedPayload,
                     signature = null,
-                    ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
+                    ttl = com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
                 )
             
             delegate?.sendPacket(packet)
-            Log.d(TAG, "📤 Sent delivery ACK to $senderPeerID for message $messageID")
+            Log.i(TAG, "📤 Sent delivery ACK to $senderPeerID for message $messageID")
             
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send delivery ACK to $senderPeerID: ${e.message}")
@@ -222,8 +222,8 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         // Ignore stale announcements older than STALE_PEER_TIMEOUT
         val now = System.currentTimeMillis()
         val age = now - packet.timestamp.toLong()
-        if (age > com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
-            Log.w(TAG, "Ignoring stale ANNOUNCE from ${peerID.take(8)} (age=${age}ms > ${com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS}ms)")
+        if (age > com.roman.zemzeme.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
+            Log.w(TAG, "Ignoring stale ANNOUNCE from ${peerID.take(8)} (age=${age}ms > ${com.roman.zemzeme.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS}ms)")
             return false
         }
         
@@ -260,7 +260,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         }
         
         // Successfully decoded TLV format exactly like iOS
-        Log.d(TAG, "✅ Verified announce from $peerID: nickname=${announcement.nickname}, " +
+        Log.i(TAG, "✅ Verified announce from $peerID: nickname=${announcement.nickname}, " +
                 "noisePublicKey=${announcement.noisePublicKey.joinToString("") { "%02x".format(it) }.take(16)}..., " +
                 "signingPublicKey=${announcement.signingPublicKey.joinToString("") { "%02x".format(it) }.take(16)}...")
         
@@ -288,12 +288,12 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         
         // Update mesh graph from gossip neighbors (only if TLV present)
         try {
-            val neighborsOrNull = com.bitchat.android.services.meshgraph.GossipTLV.decodeNeighborsFromAnnouncementPayload(packet.payload)
-            com.bitchat.android.services.meshgraph.MeshGraphService.getInstance()
+            val neighborsOrNull = com.roman.zemzeme.services.meshgraph.GossipTLV.decodeNeighborsFromAnnouncementPayload(packet.payload)
+            com.roman.zemzeme.services.meshgraph.MeshGraphService.getInstance()
                 .updateFromAnnouncement(peerID, nickname, neighborsOrNull, packet.timestamp)
         } catch (_: Exception) { }
 
-        Log.d(TAG, "✅ Processed verified TLV announce: stored identity for $peerID")
+        Log.i(TAG, "✅ Processed verified TLV announce: stored identity for $peerID")
         return isFirstAnnounce
     }
     
@@ -305,7 +305,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
         
-        Log.d(TAG, "Processing Noise handshake from $peerID (${packet.payload.size} bytes)")
+        Log.i(TAG, "Processing Noise handshake from $peerID (${packet.payload.size} bytes)")
         
         // Skip our own handshake messages
         if (peerID == myPeerID) return
@@ -313,7 +313,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         // Check if handshake is addressed to us
         val recipientID = packet.recipientID?.toHexString()
         if (recipientID != myPeerID) {
-            Log.d(TAG, "Handshake not for me (for $recipientID, I am $myPeerID)")
+            Log.i(TAG, "Handshake not for me (for $recipientID, I am $myPeerID)")
             return
         }
         
@@ -322,10 +322,10 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             val response = delegate?.processNoiseHandshakeMessage(packet.payload, peerID)
             
             if (response != null) {
-                Log.d(TAG, "Generated handshake response for $peerID (${response.size} bytes)")
+                Log.i(TAG, "Generated handshake response for $peerID (${response.size} bytes)")
                 
                 // Send response using same packet type (simplified iOS approach)
-                val responsePacket = BitchatPacket(
+                val responsePacket = ZemzemePacket(
                     version = 1u,
                     type = MessageType.NOISE_HANDSHAKE.value,
                     senderID = hexStringToByteArray(myPeerID),
@@ -333,17 +333,17 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     timestamp = System.currentTimeMillis().toULong(),
                     payload = response,
                     signature = null,
-                    ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS // Same TTL as iOS
+                    ttl = com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS // Same TTL as iOS
                 )
                 
                 delegate?.sendPacket(responsePacket)
-                Log.d(TAG, "📤 Sent handshake response to $peerID")
+                Log.i(TAG, "📤 Sent handshake response to $peerID")
             }
             
             // Check if session is now established
             val hasSession = delegate?.hasNoiseSession(peerID) ?: false
             if (hasSession) {
-                Log.d(TAG, "✅ Noise session established with $peerID")
+                Log.i(TAG, "✅ Noise session established with $peerID")
             }
             
         } catch (e: Exception) {
@@ -360,7 +360,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         if (peerID == myPeerID) return
         val senderNickname = delegate?.getPeerNickname(peerID)
         if (senderNickname != null) {
-            Log.d(TAG, "Received message from $senderNickname")
+            Log.i(TAG, "Received message from $senderNickname")
             delegate?.updatePeerNickname(peerID, senderNickname)
         }
         
@@ -392,22 +392,22 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         
         try {
             // Try file packet first (voice, image, etc.) and log outcome for FILE_TRANSFER
-            val isFileTransfer = com.bitchat.android.protocol.MessageType.fromValue(packet.type) == com.bitchat.android.protocol.MessageType.FILE_TRANSFER
-            val file = com.bitchat.android.model.BitchatFilePacket.decode(packet.payload)
+            val isFileTransfer = com.roman.zemzeme.protocol.MessageType.fromValue(packet.type) == com.roman.zemzeme.protocol.MessageType.FILE_TRANSFER
+            val file = com.roman.zemzeme.model.ZemzemeFilePacket.decode(packet.payload)
             if (file != null) {
                 if (isFileTransfer) {
-                    Log.d(TAG, "📥 FILE_TRANSFER decode success (broadcast): name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}', from=${peerID.take(8)}")
+                    Log.i(TAG, "📥 FILE_TRANSFER decode success (broadcast): name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}', from=${peerID.take(8)}")
                 }
-                val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(appContext, file)
-                val message = BitchatMessage(
+                val savedPath = com.roman.zemzeme.features.file.FileUtils.saveIncomingFile(appContext, file)
+                val message = ZemzemeMessage(
                     id = java.util.UUID.randomUUID().toString().uppercase(),
                     sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                     content = savedPath,
-                    type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
+                    type = com.roman.zemzeme.features.file.FileUtils.messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
                     timestamp = Date(packet.timestamp.toLong())
                 )
-                Log.d(TAG, "📄 Saved incoming file to $savedPath")
+                Log.i(TAG, "📄 Saved incoming file to $savedPath")
                 delegate?.onMessageReceived(message)
                 return
             } else if (isFileTransfer) {
@@ -415,7 +415,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             }
 
             // Fallback: plain text
-            val message = BitchatMessage(
+            val message = ZemzemeMessage(
                 sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                 content = String(packet.payload, Charsets.UTF_8),
                 senderPeerID = peerID,
@@ -430,7 +430,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
     /**
      * Handle (decrypted) private message addressed to us
      */
-    private suspend fun handlePrivateMessage(packet: BitchatPacket, peerID: String) {
+    private suspend fun handlePrivateMessage(packet: ZemzemePacket, peerID: String) {
         try {
             // Verify signature if present
             if (packet.signature != null && !delegate?.verifySignature(packet, peerID)!!) {
@@ -439,24 +439,24 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             }
 
             // Try file packet first (voice, image, etc.) and log outcome for FILE_TRANSFER
-            val isFileTransfer = com.bitchat.android.protocol.MessageType.fromValue(packet.type) == com.bitchat.android.protocol.MessageType.FILE_TRANSFER
-            val file = com.bitchat.android.model.BitchatFilePacket.decode(packet.payload)
+            val isFileTransfer = com.roman.zemzeme.protocol.MessageType.fromValue(packet.type) == com.roman.zemzeme.protocol.MessageType.FILE_TRANSFER
+            val file = com.roman.zemzeme.model.ZemzemeFilePacket.decode(packet.payload)
             if (file != null) {
                 if (isFileTransfer) {
-                    Log.d(TAG, "📥 FILE_TRANSFER decode success (private): name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}', from=${peerID.take(8)}")
+                    Log.i(TAG, "📥 FILE_TRANSFER decode success (private): name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}', from=${peerID.take(8)}")
                 }
-                val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(appContext, file)
-                val message = BitchatMessage(
+                val savedPath = com.roman.zemzeme.features.file.FileUtils.saveIncomingFile(appContext, file)
+                val message = ZemzemeMessage(
                     id = java.util.UUID.randomUUID().toString().uppercase(),
                     sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                     content = savedPath,
-                    type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
+                    type = com.roman.zemzeme.features.file.FileUtils.messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
                     timestamp = Date(packet.timestamp.toLong()),
                     isPrivate = true,
                     recipientNickname = delegate?.getMyNickname()
                 )
-                Log.d(TAG, "📄 Saved incoming file to $savedPath")
+                Log.i(TAG, "📄 Saved incoming file to $savedPath")
                 delegate?.onMessageReceived(message)
                 return
             } else if (isFileTransfer) {
@@ -464,7 +464,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             }
 
             // Fallback: plain text
-            val message = BitchatMessage(
+            val message = ZemzemeMessage(
                 sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                 content = String(packet.payload, Charsets.UTF_8),
                 senderPeerID = peerID,
@@ -551,15 +551,15 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             val peerInfo = delegate?.getPeerInfo(fromPeerID)
             val noiseKey = peerInfo?.noisePublicKey
             if (noiseKey != null) {
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updatePeerFavoritedUs(noiseKey, isFavorite)
+                com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.updatePeerFavoritedUs(noiseKey, isFavorite)
                 if (npub != null) {
                     // Index by noise key and current mesh peerID for fast Nostr routing
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKey(noiseKey, npub)
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKeyForPeerID(fromPeerID, npub)
+                    com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.updateNostrPublicKey(noiseKey, npub)
+                    com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.updateNostrPublicKeyForPeerID(fromPeerID, npub)
                 }
 
                 // Determine iOS-style guidance text
-                val rel = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+                val rel = com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
                 val guidance = if (isFavorite) {
                     if (rel?.isFavorite == true) {
                         " — mutual! You can continue DMs via Nostr when out of mesh."
@@ -572,7 +572,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
 
                 // Emit system message via delegate callback
                 val action = if (isFavorite) "favorited" else "unfavorited"
-                val sys = com.bitchat.android.model.BitchatMessage(
+                val sys = com.roman.zemzeme.model.ZemzemeMessage(
                     sender = "system",
                     content = "${peerInfo.nickname} $action you$guidance",
                     timestamp = java.util.Date(),
@@ -601,12 +601,12 @@ interface MessageHandlerDelegate {
     fun updatePeerInfo(peerID: String, nickname: String, noisePublicKey: ByteArray, signingPublicKey: ByteArray, isVerified: Boolean): Boolean
     
     // Packet operations
-    fun sendPacket(packet: BitchatPacket)
+    fun sendPacket(packet: ZemzemePacket)
     fun relayPacket(routed: RoutedPacket)
     fun getBroadcastRecipient(): ByteArray
     
     // Cryptographic operations
-    fun verifySignature(packet: BitchatPacket, peerID: String): Boolean
+    fun verifySignature(packet: ZemzemePacket, peerID: String): Boolean
     fun encryptForPeer(data: ByteArray, recipientPeerID: String): ByteArray?
     fun decryptFromPeer(encryptedData: ByteArray, senderPeerID: String): ByteArray?
     fun verifyEd25519Signature(signature: ByteArray, data: ByteArray, publicKey: ByteArray): Boolean
@@ -622,7 +622,7 @@ interface MessageHandlerDelegate {
     fun decryptChannelMessage(encryptedContent: ByteArray, channel: String): String?
 
     // Callbacks
-    fun onMessageReceived(message: BitchatMessage)
+    fun onMessageReceived(message: ZemzemeMessage)
     fun onChannelLeave(channel: String, fromPeer: String)
     fun onDeliveryAckReceived(messageID: String, peerID: String)
     fun onReadReceiptReceived(messageID: String, peerID: String)

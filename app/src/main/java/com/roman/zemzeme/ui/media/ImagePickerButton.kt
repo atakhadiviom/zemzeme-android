@@ -50,7 +50,7 @@ fun ImagePickerButton(
         val path = capturedImagePath
         if (success && !path.isNullOrBlank()) {
             // Downscale + correct orientation, then send; delete original
-            val outPath = com.bitchat.android.features.media.ImageUtils.downscalePathAndSaveToAppFiles(context, path)
+            val outPath = com.roman.zemzeme.features.media.ImageUtils.downscalePathAndSaveToAppFiles(context, path)
             if (!outPath.isNullOrBlank()) {
                 onImageReady(outPath)
             }
@@ -103,7 +103,7 @@ fun ImagePickerButton(
     ) {
         Icon(
             imageVector = Icons.Filled.PhotoCamera,
-            contentDescription = stringResource(com.bitchat.android.R.string.pick_image),
+            contentDescription = stringResource(com.roman.zemzeme.R.string.pick_image),
             tint = Color.Gray,
             modifier = Modifier.size(20.dp)
         )

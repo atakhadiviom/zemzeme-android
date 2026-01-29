@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 class OpenStreetMapGeocoderProvider : GeocoderProvider {
     private val TAG = "OSMGeocoderProvider"
     private val gson = Gson()
-    private val userAgent = "Bitchat-Android/1.0"
+    private val userAgent = "Zemzeme-Android/1.0"
 
     override suspend fun getFromLocation(latitude: Double, longitude: Double, maxResults: Int): List<Address> {
         return withContext(Dispatchers.IO) {

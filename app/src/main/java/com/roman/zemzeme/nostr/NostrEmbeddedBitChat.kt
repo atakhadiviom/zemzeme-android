@@ -4,20 +4,20 @@ import android.util.Base64
 import android.util.Log
 import com.roman.zemzeme.model.PrivateMessagePacket
 import com.roman.zemzeme.model.NoisePayloadType
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import java.util.*
 
 /**
- * BitChat-over-Nostr Adapter
+ * Zemzeme-over-Nostr Adapter
  * Direct port from iOS implementation for 100% compatibility
  */
-object NostrEmbeddedBitChat {
+object NostrEmbeddedZemzeme {
     
-    private const val TAG = "NostrEmbeddedBitChat"
+    private const val TAG = "NostrEmbeddedZemzeme"
     
     /**
-     * Build a `bitchat1:` base64url-encoded BitChat packet carrying a private message for Nostr DMs.
+     * Build a `bitchat1:` base64url-encoded Zemzeme packet carrying a private message for Nostr DMs.
      */
     fun encodePMForNostr(
         content: String,
@@ -38,7 +38,7 @@ object NostrEmbeddedBitChat {
             // Determine 8-byte recipient ID to embed
             val recipientIDHex = normalizeRecipientPeerID(recipientPeerID)
             
-            val packet = BitchatPacket(
+            val packet = ZemzemePacket(
                 version = 1u,
                 type = MessageType.NOISE_ENCRYPTED.value,
                 senderID = hexStringToByteArray(senderPeerID),
@@ -46,7 +46,7 @@ object NostrEmbeddedBitChat {
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = payload,
                 signature = null,
-                ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                ttl = com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS
             )
             
             val data = packet.toBinaryData() ?: return null
@@ -58,7 +58,7 @@ object NostrEmbeddedBitChat {
     }
     
     /**
-     * Build a `bitchat1:` base64url-encoded BitChat packet carrying a delivery/read ack for Nostr DMs.
+     * Build a `bitchat1:` base64url-encoded Zemzeme packet carrying a delivery/read ack for Nostr DMs.
      */
     fun encodeAckForNostr(
         type: NoisePayloadType,
@@ -78,7 +78,7 @@ object NostrEmbeddedBitChat {
             
             val recipientIDHex = normalizeRecipientPeerID(recipientPeerID)
             
-            val packet = BitchatPacket(
+            val packet = ZemzemePacket(
                 version = 1u,
                 type = MessageType.NOISE_ENCRYPTED.value,
                 senderID = hexStringToByteArray(senderPeerID),
@@ -86,7 +86,7 @@ object NostrEmbeddedBitChat {
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = payload,
                 signature = null,
-                ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                ttl = com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS
             )
             
             val data = packet.toBinaryData() ?: return null
@@ -115,7 +115,7 @@ object NostrEmbeddedBitChat {
             val messageIDBytes = messageID.toByteArray(Charsets.UTF_8)
             System.arraycopy(messageIDBytes, 0, payload, 1, messageIDBytes.size)
             
-            val packet = BitchatPacket(
+            val packet = ZemzemePacket(
                 version = 1u,
                 type = MessageType.NOISE_ENCRYPTED.value,
                 senderID = hexStringToByteArray(senderPeerID),
@@ -123,7 +123,7 @@ object NostrEmbeddedBitChat {
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = payload,
                 signature = null,
-                ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                ttl = com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS
             )
             
             val data = packet.toBinaryData() ?: return null
@@ -150,7 +150,7 @@ object NostrEmbeddedBitChat {
             payload[0] = NoisePayloadType.PRIVATE_MESSAGE.value.toByte()
             System.arraycopy(tlv, 0, payload, 1, tlv.size)
             
-            val packet = BitchatPacket(
+            val packet = ZemzemePacket(
                 version = 1u,
                 type = MessageType.NOISE_ENCRYPTED.value,
                 senderID = hexStringToByteArray(senderPeerID),
@@ -158,7 +158,7 @@ object NostrEmbeddedBitChat {
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = payload,
                 signature = null,
-                ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                ttl = com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS
             )
             
             val data = packet.toBinaryData() ?: return null

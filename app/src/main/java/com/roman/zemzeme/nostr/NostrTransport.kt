@@ -19,7 +19,7 @@ class NostrTransport(
     
     companion object {
         private const val TAG = "NostrTransport"
-        private const val READ_ACK_INTERVAL = com.bitchat.android.util.AppConstants.Nostr.READ_ACK_INTERVAL_MS // ~3 per second (0.35s interval like iOS)
+        private const val READ_ACK_INTERVAL = com.roman.zemzeme.util.AppConstants.Nostr.READ_ACK_INTERVAL_MS // ~3 per second (0.35s interval like iOS)
         
         @Volatile
         private var INSTANCE: NostrTransport? = null
@@ -97,7 +97,7 @@ class NostrTransport(
             }
 
             val recipientPeerIDForEmbed = try {
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared
+                com.roman.zemzeme.favorites.FavoritesPersistenceService.shared
                     .findPeerIDForNostrPubkey(recipientNostrPubkey)
             } catch (_: Exception) { null }
             if (recipientPeerIDForEmbed.isNullOrBlank()) {
@@ -106,7 +106,7 @@ class NostrTransport(
                 )
             }
 
-            val embedded = NostrEmbeddedBitChat.encodePMForNostr(
+            val embedded = NostrEmbeddedZemzeme.encodePMForNostr(
                 content = content,
                 messageID = messageID,
                 recipientPeerID = recipientPeerIDForEmbed,
@@ -123,7 +123,7 @@ class NostrTransport(
             }
 
             giftWraps.forEach { event ->
-                Log.d(TAG, "NostrTransport: sending PM giftWrap id=${event.id.take(16)}...")
+                Log.i(TAG, "NostrTransport: sending PM giftWrap id=${event.id.take(16)}...")
                 relayManager.sendEvent(event)
             }
         }
@@ -170,7 +170,7 @@ class NostrTransport(
                     return@launch
                 }
                 
-                Log.d(TAG, "NostrTransport: preparing READ ack for id=${item.receipt.originalMessageID.take(8)}... to ${recipientNostrPubkey.take(16)}...")
+                Log.i(TAG, "NostrTransport: preparing READ ack for id=${item.receipt.originalMessageID.take(8)}... to ${recipientNostrPubkey.take(16)}...")
                 
                 // Convert recipient npub -> hex
                 val recipientHex = try {
@@ -185,7 +185,7 @@ class NostrTransport(
                     return@launch
                 }
                 
-                val ack = NostrEmbeddedBitChat.encodeAckForNostr(
+                val ack = NostrEmbeddedZemzeme.encodeAckForNostr(
                     type = NoisePayloadType.READ_RECEIPT,
                     messageID = item.receipt.originalMessageID,
                     recipientPeerID = item.peerID,
@@ -205,7 +205,7 @@ class NostrTransport(
                 )
                 
                 giftWraps.forEach { event ->
-                    Log.d(TAG, "NostrTransport: sending READ ack giftWrap id=${event.id.take(16)}...")
+                    Log.i(TAG, "NostrTransport: sending READ ack giftWrap id=${event.id.take(16)}...")
                     NostrRelayManager.getInstance(context).sendEvent(event)
                 }
                 
@@ -268,7 +268,7 @@ class NostrTransport(
                 throw IllegalStateException("Failed to decode recipient npub", e)
             }
 
-            val embedded = NostrEmbeddedBitChat.encodePMForNostr(
+            val embedded = NostrEmbeddedZemzeme.encodePMForNostr(
                 content = content,
                 messageID = UUID.randomUUID().toString(),
                 recipientPeerID = to,
@@ -285,7 +285,7 @@ class NostrTransport(
             }
 
             giftWraps.forEach { event ->
-                Log.d(TAG, "NostrTransport: sending favorite giftWrap id=${event.id.take(16)}...")
+                Log.i(TAG, "NostrTransport: sending favorite giftWrap id=${event.id.take(16)}...")
                 relayManager.sendEvent(event)
             }
         }
@@ -317,7 +317,7 @@ class NostrTransport(
             val senderIdentity = NostrIdentityBridge.getCurrentNostrIdentity(context)
                 ?: throw IllegalStateException("No Nostr identity available for delivery ack")
 
-            Log.d(TAG, "NostrTransport: preparing DELIVERED ack for id=${messageID.take(8)}... to ${recipientNostrPubkey.take(16)}...")
+            Log.i(TAG, "NostrTransport: preparing DELIVERED ack for id=${messageID.take(8)}... to ${recipientNostrPubkey.take(16)}...")
 
             val recipientHex = try {
                 val (hrp, data) = Bech32.decode(recipientNostrPubkey)
@@ -329,7 +329,7 @@ class NostrTransport(
                 throw IllegalStateException("Failed to decode recipient npub", e)
             }
 
-            val ack = NostrEmbeddedBitChat.encodeAckForNostr(
+            val ack = NostrEmbeddedZemzeme.encodeAckForNostr(
                 type = NoisePayloadType.DELIVERED,
                 messageID = messageID,
                 recipientPeerID = to,
@@ -346,7 +346,7 @@ class NostrTransport(
             }
 
             giftWraps.forEach { event ->
-                Log.d(TAG, "NostrTransport: sending DELIVERED ack giftWrap id=${event.id.take(16)}...")
+                Log.i(TAG, "NostrTransport: sending DELIVERED ack giftWrap id=${event.id.take(16)}...")
                 relayManager.sendEvent(event)
             }
         }
@@ -361,9 +361,9 @@ class NostrTransport(
     ) {
         transportScope.launch {
             try {
-                Log.d(TAG, "GeoDM: send DELIVERED -> recip=${toRecipientHex.take(8)}... mid=${messageID.take(8)}... from=${fromIdentity.publicKeyHex.take(8)}...")
+                Log.i(TAG, "GeoDM: send DELIVERED -> recip=${toRecipientHex.take(8)}... mid=${messageID.take(8)}... from=${fromIdentity.publicKeyHex.take(8)}...")
                 
-                val embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(
+                val embedded = NostrEmbeddedZemzeme.encodeAckForNostrNoRecipient(
                     type = NoisePayloadType.DELIVERED,
                     messageID = messageID,
                     senderPeerID = senderPeerID
@@ -396,9 +396,9 @@ class NostrTransport(
     ) {
         transportScope.launch {
             try {
-                Log.d(TAG, "GeoDM: send READ -> recip=${toRecipientHex.take(8)}... mid=${messageID.take(8)}... from=${fromIdentity.publicKeyHex.take(8)}...")
+                Log.i(TAG, "GeoDM: send READ -> recip=${toRecipientHex.take(8)}... mid=${messageID.take(8)}... from=${fromIdentity.publicKeyHex.take(8)}...")
                 
-                val embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(
+                val embedded = NostrEmbeddedZemzeme.encodeAckForNostrNoRecipient(
                     type = NoisePayloadType.READ_RECEIPT,
                     messageID = messageID,
                     senderPeerID = senderPeerID
@@ -435,9 +435,9 @@ class NostrTransport(
         // Use provided geohash or derive from current location
         val geohash = sourceGeohash ?: run {
             val selected = try {
-                com.bitchat.android.geohash.LocationChannelManager.getInstance(context).selectedChannel.value
+                com.roman.zemzeme.geohash.LocationChannelManager.getInstance(context).selectedChannel.value
             } catch (_: Exception) { null }
-            if (selected !is com.bitchat.android.geohash.ChannelID.Location) {
+            if (selected !is com.roman.zemzeme.geohash.ChannelID.Location) {
                 Log.w(TAG, "NostrTransport: cannot send geohash PM - not in a location channel and no geohash provided")
                 return
             }
@@ -460,8 +460,8 @@ class NostrTransport(
                     "GeoDM: send PM -> recip=${toRecipientHex.take(8)}... mid=${messageID.take(8)}... from=${fromIdentity.publicKeyHex.take(8)}... geohash=$geohash"
                 )
 
-                // Build embedded BitChat packet without recipient peer ID
-                val embedded = NostrEmbeddedBitChat.encodePMForNostrNoRecipient(
+                // Build embedded Zemzeme packet without recipient peer ID
+                val embedded = NostrEmbeddedZemzeme.encodePMForNostrNoRecipient(
                     content = content,
                     messageID = messageID,
                     senderPeerID = senderPeerID
@@ -477,7 +477,7 @@ class NostrTransport(
                 )
 
                 giftWraps.forEach { event ->
-                    Log.d(TAG, "NostrTransport: sending geohash PM giftWrap id=${event.id.take(16)}...")
+                    Log.i(TAG, "NostrTransport: sending geohash PM giftWrap id=${event.id.take(16)}...")
                     NostrRelayManager.registerPendingGiftWrap(event.id)
                     NostrRelayManager.getInstance(context).sendEvent(event)
                 }
@@ -495,16 +495,16 @@ class NostrTransport(
     private fun resolveNostrPublicKey(peerID: String): String? {
         try {
             // 1) Fast path: direct peerID→npub mapping (mutual favorites after mesh mapping)
-            com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkeyForPeerID(peerID)?.let { return it }
+            com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.findNostrPubkeyForPeerID(peerID)?.let { return it }
 
             // 2) Legacy path: resolve by noise public key association
             val noiseKey = hexStringToByteArray(peerID)
-            val favoriteStatus = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+            val favoriteStatus = com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
             if (favoriteStatus?.peerNostrPublicKey != null) return favoriteStatus.peerNostrPublicKey
 
             // 3) Prefix match on noiseHex from 16-hex peerID
             if (peerID.length == 16) {
-                val fallbackStatus = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                val fallbackStatus = com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
                 return fallbackStatus?.peerNostrPublicKey
             }
             

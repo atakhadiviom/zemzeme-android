@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * P2P Configuration Manager for BitChat
+ * P2P Configuration Manager for Zemzeme
  * 
  * Manages P2P settings including:
  * - Bootstrap nodes (IPFS public + optional custom)

@@ -1,6 +1,6 @@
 package com.roman.zemzeme.services
 
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.model.DeliveryStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,22 +18,22 @@ object AppStateStore {
     val peers: StateFlow<List<String>> = _peers.asStateFlow()
 
     // Public mesh timeline messages (non-channel)
-    private val _publicMessages = MutableStateFlow<List<BitchatMessage>>(emptyList())
-    val publicMessages: StateFlow<List<BitchatMessage>> = _publicMessages.asStateFlow()
+    private val _publicMessages = MutableStateFlow<List<ZemzemeMessage>>(emptyList())
+    val publicMessages: StateFlow<List<ZemzemeMessage>> = _publicMessages.asStateFlow()
 
     // Private messages by peerID
-    private val _privateMessages = MutableStateFlow<Map<String, List<BitchatMessage>>>(emptyMap())
-    val privateMessages: StateFlow<Map<String, List<BitchatMessage>>> = _privateMessages.asStateFlow()
+    private val _privateMessages = MutableStateFlow<Map<String, List<ZemzemeMessage>>>(emptyMap())
+    val privateMessages: StateFlow<Map<String, List<ZemzemeMessage>>> = _privateMessages.asStateFlow()
 
     // Channel messages by channel name
-    private val _channelMessages = MutableStateFlow<Map<String, List<BitchatMessage>>>(emptyMap())
-    val channelMessages: StateFlow<Map<String, List<BitchatMessage>>> = _channelMessages.asStateFlow()
+    private val _channelMessages = MutableStateFlow<Map<String, List<ZemzemeMessage>>>(emptyMap())
+    val channelMessages: StateFlow<Map<String, List<ZemzemeMessage>>> = _channelMessages.asStateFlow()
 
     fun setPeers(ids: List<String>) {
         _peers.value = ids
     }
 
-    fun addPublicMessage(msg: BitchatMessage) {
+    fun addPublicMessage(msg: ZemzemeMessage) {
         synchronized(this) {
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)
@@ -41,7 +41,7 @@ object AppStateStore {
         }
     }
 
-    fun addPrivateMessage(peerID: String, msg: BitchatMessage) {
+    fun addPrivateMessage(peerID: String, msg: ZemzemeMessage) {
         synchronized(this) {
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)
@@ -85,7 +85,7 @@ object AppStateStore {
         }
     }
 
-    fun addChannelMessage(channel: String, msg: BitchatMessage) {
+    fun addChannelMessage(channel: String, msg: ZemzemeMessage) {
         synchronized(this) {
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)

@@ -48,7 +48,7 @@ class BluetoothPacketBroadcaster(
     
     companion object {
         private const val TAG = "BluetoothPacketBroadcaster"
-        private const val CLEANUP_DELAY = com.bitchat.android.util.AppConstants.Mesh.BROADCAST_CLEANUP_DELAY_MS
+        private const val CLEANUP_DELAY = com.roman.zemzeme.util.AppConstants.Mesh.BROADCAST_CLEANUP_DELAY_MS
     }
 
     // Optional nickname resolver injected by higher layer (peerID -> nickname?)
@@ -76,7 +76,7 @@ class BluetoothPacketBroadcaster(
         try {
             val fromNick = incomingPeer?.let { nicknameResolver?.invoke(it) }
             val toNick = toPeer?.let { nicknameResolver?.invoke(it) }
-            val manager = com.bitchat.android.ui.debug.DebugSettingsManager.getInstance()
+            val manager = com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance()
             // Always log outgoing for the actual transmission target
             manager.logOutgoing(
                 packetType = typeName,
@@ -124,13 +124,13 @@ class BluetoothPacketBroadcaster(
     private val broadcasterActor = broadcasterScope.actor<BroadcastRequest>(
         capacity = Channel.UNLIMITED
     ) {
-        Log.d(TAG, "🎭 Created packet broadcaster actor")
+        Log.i(TAG, "🎭 Created packet broadcaster actor")
         try {
             for (request in channel) {
                 broadcastSinglePacketInternal(request.routed, request.gattServer, request.characteristic)
             }
         } finally {
-            Log.d(TAG, "🎭 Packet broadcaster actor terminated")
+            Log.i(TAG, "🎭 Packet broadcaster actor terminated")
         }
     }
     
@@ -142,7 +142,7 @@ class BluetoothPacketBroadcaster(
         val packet = routed.packet
         val isFile = packet.type == MessageType.FILE_TRANSFER.value
         if (isFile) {
-            Log.d(TAG, "📤 Broadcasting FILE_TRANSFER: ${packet.payload.size} bytes")
+            Log.i(TAG, "📤 Broadcasting FILE_TRANSFER: ${packet.payload.size} bytes")
         }
         // Prefer caller-provided transferId (e.g., for encrypted media), else derive for FILE_TRANSFER
         val transferId = routed.transferId ?: (if (isFile) sha256Hex(packet.payload) else null)
@@ -159,9 +159,9 @@ class BluetoothPacketBroadcaster(
             }
             if (fragments.size > 1) {
                 if (isFile) {
-                    Log.d(TAG, "🔀 File needs ${fragments.size} fragments")
+                    Log.i(TAG, "🔀 File needs ${fragments.size} fragments")
                 }
-                Log.d(TAG, "Fragmenting packet into ${fragments.size} fragments")
+                Log.i(TAG, "Fragmenting packet into ${fragments.size} fragments")
                 if (transferId != null) {
                     TransferProgressManager.start(transferId, fragments.size)
                 }
@@ -220,7 +220,7 @@ class BluetoothPacketBroadcaster(
         val data = packet.toBinaryData() ?: return false
         val isFile = packet.type == MessageType.FILE_TRANSFER.value
         if (isFile) {
-            Log.d(TAG, "📤 Broadcasting FILE_TRANSFER: ${packet.payload.size} bytes")
+            Log.i(TAG, "📤 Broadcasting FILE_TRANSFER: ${packet.payload.size} bytes")
         }
         // Prefer caller-provided transferId (e.g., for encrypted media), else derive for FILE_TRANSFER
         val transferId = routed.transferId ?: (if (isFile) sha256Hex(packet.payload) else null)
@@ -355,7 +355,7 @@ class BluetoothPacketBroadcaster(
         // If we are the sender and a source route is defined, we must send ONLY to the first hop.
         if (packet.senderID.toHexString() == myPeerID && !packet.route.isNullOrEmpty()) {
             val firstHop = packet.route!![0].toHexString()
-            Log.d(TAG, "Source Routing: Packet has explicit route, attempting to send to first hop: $firstHop")
+            Log.i(TAG, "Source Routing: Packet has explicit route, attempting to send to first hop: $firstHop")
 
             var sent = false
 
@@ -364,7 +364,7 @@ class BluetoothPacketBroadcaster(
                 .firstOrNull { connectionTracker.addressPeerMap[it.address] == firstHop }
             
             if (serverTarget != null) {
-                Log.d(TAG, "Source Routing: sending directly to first hop (server conn) $firstHop: ${serverTarget.address}")
+                Log.i(TAG, "Source Routing: sending directly to first hop (server conn) $firstHop: ${serverTarget.address}")
                 if (notifyDevice(serverTarget, data, gattServer, characteristic)) {
                     val toPeer = connectionTracker.addressPeerMap[serverTarget.address]
                     logPacketRelay(typeName, senderPeerID, senderNick, incomingPeer, incomingAddr, toPeer, serverTarget.address, packet.ttl, packet.version, routeInfo)
@@ -378,7 +378,7 @@ class BluetoothPacketBroadcaster(
                     .firstOrNull { connectionTracker.addressPeerMap[it.device.address] == firstHop }
                 
                 if (clientTarget != null) {
-                    Log.d(TAG, "Source Routing: sending directly to first hop (client conn) $firstHop: ${clientTarget.device.address}")
+                    Log.i(TAG, "Source Routing: sending directly to first hop (client conn) $firstHop: ${clientTarget.device.address}")
                     if (writeToDeviceConn(clientTarget, data)) {
                         val toPeer = connectionTracker.addressPeerMap[clientTarget.device.address]
                         logPacketRelay(typeName, senderPeerID, senderNick, incomingPeer, incomingAddr, toPeer, clientTarget.device.address, packet.ttl, packet.version, routeInfo)
@@ -401,7 +401,7 @@ class BluetoothPacketBroadcaster(
             
             // If found, send directly
             if (targetDevice != null) {
-                Log.d(TAG, "Send packet type ${packet.type} directly to target device for recipient $recipientID: ${targetDevice.address}")
+                Log.i(TAG, "Send packet type ${packet.type} directly to target device for recipient $recipientID: ${targetDevice.address}")
                 if (notifyDevice(targetDevice, data, gattServer, characteristic)) {
                     val toPeer = connectionTracker.addressPeerMap[targetDevice.address]
                     logPacketRelay(typeName, senderPeerID, senderNick, incomingPeer, incomingAddr, toPeer, targetDevice.address, packet.ttl, packet.version, routeInfo)
@@ -415,7 +415,7 @@ class BluetoothPacketBroadcaster(
             
             // If found, send directly
             if (targetDeviceConn != null) {
-                Log.d(TAG, "Send packet type ${packet.type} directly to target client connection for recipient $recipientID: ${targetDeviceConn.device.address}")
+                Log.i(TAG, "Send packet type ${packet.type} directly to target client connection for recipient $recipientID: ${targetDeviceConn.device.address}")
                 if (writeToDeviceConn(targetDeviceConn, data)) {
                     val toPeer = connectionTracker.addressPeerMap[targetDeviceConn.device.address]
                     logPacketRelay(typeName, senderPeerID, senderNick, incomingPeer, incomingAddr, toPeer, targetDeviceConn.device.address, packet.ttl, packet.version, routeInfo)
@@ -435,11 +435,11 @@ class BluetoothPacketBroadcaster(
         // Send to server connections (devices connected to our GATT server)
         subscribedDevices.forEach { device ->
             if (device.address == routed.relayAddress) {
-                Log.d(TAG, "Skipping broadcast to client back to relayer: ${device.address}")
+                Log.i(TAG, "Skipping broadcast to client back to relayer: ${device.address}")
                 return@forEach
             }
             if (connectionTracker.addressPeerMap[device.address] == senderID) {
-                Log.d(TAG, "Skipping broadcast to client back to sender: ${device.address}")
+                Log.i(TAG, "Skipping broadcast to client back to sender: ${device.address}")
                 return@forEach
             }
             val sent = notifyDevice(device, data, gattServer, characteristic)
@@ -453,11 +453,11 @@ class BluetoothPacketBroadcaster(
         connectedDevices.values.forEach { deviceConn ->
             if (deviceConn.isClient && deviceConn.gatt != null && deviceConn.characteristic != null) {
                 if (deviceConn.device.address == routed.relayAddress) {
-                    Log.d(TAG, "Skipping broadcast to server back to relayer: ${deviceConn.device.address}")
+                    Log.i(TAG, "Skipping broadcast to server back to relayer: ${deviceConn.device.address}")
                     return@forEach
                 }
                 if (connectionTracker.addressPeerMap[deviceConn.device.address] == senderID) {
-                    Log.d(TAG, "Skipping roadcast to server back to sender: ${deviceConn.device.address}")
+                    Log.i(TAG, "Skipping roadcast to server back to sender: ${deviceConn.device.address}")
                     return@forEach
                 }
                 val sent = writeToDeviceConn(deviceConn, data)
@@ -534,7 +534,7 @@ class BluetoothPacketBroadcaster(
      * Shutdown the broadcaster actor gracefully
      */
     fun shutdown() {
-        Log.d(TAG, "Shutting down BluetoothPacketBroadcaster actor")
+        Log.i(TAG, "Shutting down BluetoothPacketBroadcaster actor")
         
         // Close the actor gracefully
         broadcasterActor.close()
@@ -542,6 +542,6 @@ class BluetoothPacketBroadcaster(
         // Cancel the broadcaster scope
         broadcasterScope.cancel()
         
-        Log.d(TAG, "BluetoothPacketBroadcaster shutdown complete")
+        Log.i(TAG, "BluetoothPacketBroadcaster shutdown complete")
     }
 } 

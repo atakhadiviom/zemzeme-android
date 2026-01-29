@@ -1,7 +1,7 @@
 package com.roman.zemzeme.mesh
 
 import android.util.Log
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import com.roman.zemzeme.protocol.MessagePadding
 import com.roman.zemzeme.model.FragmentPayload
@@ -22,10 +22,10 @@ class FragmentManager {
     companion object {
         private const val TAG = "FragmentManager"
         // iOS values: 512 MTU threshold, 469 max fragment size (512 MTU - headers)
-        private const val FRAGMENT_SIZE_THRESHOLD = com.bitchat.android.util.AppConstants.Fragmentation.FRAGMENT_SIZE_THRESHOLD // Matches iOS: if data.count > 512
-        private const val MAX_FRAGMENT_SIZE = com.bitchat.android.util.AppConstants.Fragmentation.MAX_FRAGMENT_SIZE        // Matches iOS: maxFragmentSize = 469 
-        private const val FRAGMENT_TIMEOUT = com.bitchat.android.util.AppConstants.Fragmentation.FRAGMENT_TIMEOUT_MS     // Matches iOS: 30 seconds cleanup
-        private const val CLEANUP_INTERVAL = com.bitchat.android.util.AppConstants.Fragmentation.CLEANUP_INTERVAL_MS     // 10 seconds cleanup check
+        private const val FRAGMENT_SIZE_THRESHOLD = com.roman.zemzeme.util.AppConstants.Fragmentation.FRAGMENT_SIZE_THRESHOLD // Matches iOS: if data.count > 512
+        private const val MAX_FRAGMENT_SIZE = com.roman.zemzeme.util.AppConstants.Fragmentation.MAX_FRAGMENT_SIZE        // Matches iOS: maxFragmentSize = 469 
+        private const val FRAGMENT_TIMEOUT = com.roman.zemzeme.util.AppConstants.Fragmentation.FRAGMENT_TIMEOUT_MS     // Matches iOS: 30 seconds cleanup
+        private const val CLEANUP_INTERVAL = com.roman.zemzeme.util.AppConstants.Fragmentation.CLEANUP_INTERVAL_MS     // 10 seconds cleanup check
     }
     
     // Fragment storage - iOS equivalent: incomingFragments: [String: [Int: Data]]
@@ -47,7 +47,7 @@ class FragmentManager {
      * Create fragments from a large packet - 100% iOS Compatible
      * Matches iOS sendFragmentedPacket() implementation exactly
      */
-    fun createFragments(packet: BitchatPacket): List<BitchatPacket> {
+    fun createFragments(packet: ZemzemePacket): List<ZemzemePacket> {
         try {
             Log.d(TAG, "🔀 Creating fragments for packet type ${packet.type}, payload: ${packet.payload.size} bytes")
         val encoded = packet.toBinaryData()
@@ -71,7 +71,7 @@ class FragmentManager {
             return listOf(packet) // No fragmentation needed
         }
         
-        val fragments = mutableListOf<BitchatPacket>()
+        val fragments = mutableListOf<ZemzemePacket>()
         
         // iOS: let fragmentID = Data((0..<8).map { _ in UInt8.random(in: 0...255) })
         val fragmentID = FragmentPayload.generateFragmentID()
@@ -122,7 +122,7 @@ class FragmentManager {
             
             // iOS: MessageType.fragment.rawValue (single fragment type)
             // Fix: Fragments must inherit source route and use v2 if routed
-            val fragmentPacket = BitchatPacket(
+            val fragmentPacket = ZemzemePacket(
                 version = if (packet.route != null) 2u else 1u,
                 type = MessageType.FRAGMENT.value,
                 ttl = packet.ttl,
@@ -150,7 +150,7 @@ class FragmentManager {
      * Handle incoming fragment - 100% iOS Compatible  
      * Matches iOS handleFragment() implementation exactly
      */
-    fun handleFragment(packet: BitchatPacket): BitchatPacket? {
+    fun handleFragment(packet: ZemzemePacket): ZemzemePacket? {
         // iOS: guard packet.payload.count > 13 else { return }
         if (packet.payload.size < FragmentPayload.HEADER_SIZE) {
             Log.w(TAG, "Fragment packet too small: ${packet.payload.size}")
@@ -200,7 +200,7 @@ class FragmentManager {
                 }
                 
                 // Decode the original packet bytes we reassembled, so flags/compression are preserved - iOS fix
-                val originalPacket = BitchatPacket.fromBinaryData(reassembledData.toByteArray())
+                val originalPacket = ZemzemePacket.fromBinaryData(reassembledData.toByteArray())
                 if (originalPacket != null) {
                     // iOS cleanup: incomingFragments.removeValue(forKey: fragmentID)
                     incomingFragments.remove(fragmentIDString)
@@ -316,5 +316,5 @@ class FragmentManager {
  * Delegate interface for fragment manager callbacks
  */
 interface FragmentManagerDelegate {
-    fun onPacketReassembled(packet: BitchatPacket)
+    fun onPacketReassembled(packet: ZemzemePacket)
 }

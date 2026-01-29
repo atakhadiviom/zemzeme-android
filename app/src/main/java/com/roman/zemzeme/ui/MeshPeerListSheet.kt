@@ -26,10 +26,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roman.zemzeme.core.ui.component.button.CloseButton
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetCenterTopBar
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTitle
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTopBar
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetCenterTopBar
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetTitle
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetTopBar
 import com.roman.zemzeme.geohash.ChannelID
 import com.roman.zemzeme.ui.theme.BASE_FONT_SIZE
 import com.roman.zemzeme.nostr.GeohashAliasRegistry
@@ -80,7 +80,7 @@ fun MeshPeerListSheet(
     )
 
     if (isPresented) {
-        BitchatBottomSheet(
+        ZemzemeBottomSheet(
             modifier = modifier,
             onDismissRequest = onDismiss,
             sheetState = sheetState,
@@ -175,9 +175,9 @@ fun MeshPeerListSheet(
                 }
 
                 // TopBar (animated)
-                BitchatSheetTopBar(
+                ZemzemeSheetTopBar(
                     title = {
-                        BitchatSheetTitle(text = stringResource(id = R.string.your_network))
+                        ZemzemeSheetTitle(text = stringResource(id = R.string.your_network))
                     },
                     backgroundAlpha = topBarAlpha,
                     actions = {
@@ -369,7 +369,7 @@ fun PeopleSection(
         }
 
         // Offline favorites (exclude ones mapped to connected)
-        val offlineFavorites = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getOurFavorites()
+        val offlineFavorites = com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.getOurFavorites()
         offlineFavorites.forEach { fav ->
             val favPeerID = fav.peerNoisePublicKey.joinToString("") { b -> "%02x".format(b) }
             val isMappedToConnected = noiseHexByPeerID.values.any { it.equals(favPeerID, ignoreCase = true) }
@@ -446,10 +446,10 @@ fun PeopleSection(
 
             // Resolve potential Nostr conversation key for this favorite (for unread detection)
             val nostrConvKey: String? = try {
-                val npubOrHex = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(fav.peerNoisePublicKey)
+                val npubOrHex = com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.findNostrPubkey(fav.peerNoisePublicKey)
                 if (npubOrHex != null) {
                     val hex = if (npubOrHex.startsWith("npub")) {
-                        val (hrp, data) = com.bitchat.android.nostr.Bech32.decode(npubOrHex)
+                        val (hrp, data) = com.roman.zemzeme.nostr.Bech32.decode(npubOrHex)
                         if (hrp == "npub") data.joinToString("") { "%02x".format(it) } else null
                     } else {
                         npubOrHex.lowercase()
@@ -665,7 +665,7 @@ private fun PeerItem(
                     imageVector = Icons.Filled.Verified,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
-                    tint = Color(0xFF32D74B) // iOS Green
+                    tint = Color(0xFF00F5FF) // iOS Green
                 )
             }
 
@@ -820,10 +820,10 @@ fun PrivateChatSheet(
                 val latestSenderName = messages.lastOrNull { it.senderPeerID == peerID }?.sender
                 if (latestSenderName != null && !latestSenderName.startsWith("p2p:")) {
                     // Update registry with latest name from message
-                    com.bitchat.android.p2p.P2PAliasRegistry.setDisplayName(peerID, latestSenderName)
+                    com.roman.zemzeme.p2p.P2PAliasRegistry.setDisplayName(peerID, latestSenderName)
                     latestSenderName
                 } else {
-                    com.bitchat.android.p2p.P2PAliasRegistry.getDisplayName(peerID)
+                    com.roman.zemzeme.p2p.P2PAliasRegistry.getDisplayName(peerID)
                         ?: peerNicknames[peerID]
                         ?: "p2p:${peerID.removePrefix("p2p:").take(8)}…"
                 }
@@ -872,7 +872,7 @@ fun PrivateChatSheet(
     )
 
     if (isPresented) {
-        BitchatBottomSheet(
+        ZemzemeBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
         ) {
@@ -949,7 +949,7 @@ fun PrivateChatSheet(
                 }
 
                 // TopBar (fixed at top, iOS-style)
-                BitchatSheetCenterTopBar(
+                ZemzemeSheetCenterTopBar(
                     onClose = onDismiss,
                     title = {
                         // Center content: connection status + name + encryption
@@ -1017,7 +1017,7 @@ fun PrivateChatSheet(
                         ) {
                             // Only show Noise session icon for mesh peers (not Nostr or P2P)
                             if (!isNostrPeer && !isP2PPeer) {
-                                com.bitchat.android.ui.NoiseSessionIcon(
+                                com.roman.zemzeme.ui.NoiseSessionIcon(
                                     sessionState = sessionState,
                                     modifier = Modifier.size(14.dp)
                                 )

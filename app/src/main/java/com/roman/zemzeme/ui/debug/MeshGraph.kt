@@ -385,7 +385,7 @@ fun ForceDirectedMeshGraph(
                 }
 
                 drawCircle(
-                    color = Color(0xFF00C851),
+                    color = Color(0xFF00F5FF),
                     radius = 16f + (pulse * 4f), // Slight scale up
                     center = center
                 )

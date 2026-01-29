@@ -2,7 +2,7 @@ package com.roman.zemzeme.mesh
 
 import android.util.Log
 import com.roman.zemzeme.crypto.EncryptionService
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import com.roman.zemzeme.model.RoutedPacket
 import com.roman.zemzeme.util.toHexString
@@ -19,10 +19,10 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
     
     companion object {
         private const val TAG = "SecurityManager"
-        private const val MESSAGE_TIMEOUT = com.bitchat.android.util.AppConstants.Security.MESSAGE_TIMEOUT_MS // 5 minutes (same as iOS)
-        private const val CLEANUP_INTERVAL = com.bitchat.android.util.AppConstants.Security.CLEANUP_INTERVAL_MS // 5 minutes
-        private const val MAX_PROCESSED_MESSAGES = com.bitchat.android.util.AppConstants.Security.MAX_PROCESSED_MESSAGES
-        private const val MAX_PROCESSED_KEY_EXCHANGES = com.bitchat.android.util.AppConstants.Security.MAX_PROCESSED_KEY_EXCHANGES
+        private const val MESSAGE_TIMEOUT = com.roman.zemzeme.util.AppConstants.Security.MESSAGE_TIMEOUT_MS // 5 minutes (same as iOS)
+        private const val CLEANUP_INTERVAL = com.roman.zemzeme.util.AppConstants.Security.CLEANUP_INTERVAL_MS // 5 minutes
+        private const val MAX_PROCESSED_MESSAGES = com.roman.zemzeme.util.AppConstants.Security.MAX_PROCESSED_MESSAGES
+        private const val MAX_PROCESSED_KEY_EXCHANGES = com.roman.zemzeme.util.AppConstants.Security.MAX_PROCESSED_KEY_EXCHANGES
     }
     
     // Security tracking
@@ -43,7 +43,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
     /**
      * Validate packet security (timestamp, replay attacks, duplicates, signatures)
      */
-    fun validatePacket(packet: BitchatPacket, peerID: String): Boolean {
+    fun validatePacket(packet: ZemzemePacket, peerID: String): Boolean {
         // Skip validation for our own packets
         if (peerID == myPeerID) {
             Log.d(TAG, "Skipping validation for our own packet")
@@ -62,7 +62,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
             // This ensures we catch the "first announce" on a new connection for binding,
             // while still dropping looped/relayed duplicates.
             val isFreshAnnounce = messageType == MessageType.ANNOUNCE &&
-                    packet.ttl >= com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                    packet.ttl >= com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS
 
             if (!isFreshAnnounce) {
                 Log.d(TAG, "Dropping duplicate packet: $messageID")
@@ -156,7 +156,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
     /**
      * Verify packet signature
      */
-    fun verifySignature(packet: BitchatPacket, peerID: String): Boolean {
+    fun verifySignature(packet: ZemzemePacket, peerID: String): Boolean {
         return packet.signature?.let { signature ->
             try {
                 val isValid = encryptionService.verify(signature, packet.payload, peerID)
@@ -217,7 +217,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
     /**
      * Generate message ID for duplicate detection
      */
-    private fun generateMessageID(packet: BitchatPacket, peerID: String): String {
+    private fun generateMessageID(packet: ZemzemePacket, peerID: String): String {
         return when (MessageType.fromValue(packet.type)) {
             MessageType.FRAGMENT -> {
                 // For fragments, include the payload hash to distinguish different fragments
@@ -235,7 +235,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
      * Verify packet signature using peer's signing public key
      * Returns true only if signature is present and valid
      */
-    private fun verifyPacketSignature(packet: BitchatPacket, peerID: String): Boolean {
+    private fun verifyPacketSignature(packet: ZemzemePacket, peerID: String): Boolean {
         try {
             // only verify ANNOUNCE, MESSAGE, and FILE_TRANSFER
             if (MessageType.fromValue(packet.type) !in setOf(
@@ -257,7 +257,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
             if (MessageType.fromValue(packet.type) == MessageType.ANNOUNCE) {
                 // Special Case: ANNOUNCE packets carry their own signing key
                 try {
-                    val announcement = com.bitchat.android.model.IdentityAnnouncement.decode(packet.payload)
+                    val announcement = com.roman.zemzeme.model.IdentityAnnouncement.decode(packet.payload)
                     signingPublicKey = announcement?.signingPublicKey
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to decode announcement for key extraction: ${e.message}")

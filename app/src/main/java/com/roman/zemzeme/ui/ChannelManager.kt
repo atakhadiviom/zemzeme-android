@@ -6,7 +6,7 @@ import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import java.util.*
 
 /**
@@ -176,7 +176,7 @@ class ChannelManager(
     
     // MARK: - Channel Management
     
-    fun addChannelMessage(channel: String, message: BitchatMessage, senderPeerID: String?) {
+    fun addChannelMessage(channel: String, message: ZemzemeMessage, senderPeerID: String?) {
         messageManager.addChannelMessage(channel, message)
         
         // Track as channel member

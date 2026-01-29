@@ -130,7 +130,7 @@ fun VoiceRecordButton(
     ) {
         Icon(
             imageVector = Icons.Filled.Mic,
-            contentDescription = stringResource(com.bitchat.android.R.string.cd_record_voice),
+            contentDescription = stringResource(com.roman.zemzeme.R.string.cd_record_voice),
             tint = Color.Black,
             modifier = Modifier.size(20.dp)
         )

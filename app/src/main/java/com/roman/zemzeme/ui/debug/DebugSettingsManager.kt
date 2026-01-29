@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.util.toHexString
 
 /**
@@ -516,7 +516,7 @@ class DebugSettingsManager private constructor() {
     fun setNicknameResolver(resolver: (String) -> String?) { nicknameResolver = resolver }
     
     // Explicit incoming/outgoing logging to avoid double counting
-    fun logIncoming(packet: BitchatPacket, fromPeerID: String, fromNickname: String?, fromDeviceAddress: String?, myPeerID: String) {
+    fun logIncoming(packet: ZemzemePacket, fromPeerID: String, fromNickname: String?, fromDeviceAddress: String?, myPeerID: String) {
         val packetType = packet.type.toString()
         val packetVersion = packet.version
         val route = packet.route

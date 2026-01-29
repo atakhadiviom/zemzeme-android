@@ -1,7 +1,7 @@
 package com.roman.zemzeme.ui
 
-import com.roman.zemzeme.model.BitchatMessage
-import com.roman.zemzeme.model.BitchatMessageType
+import com.roman.zemzeme.model.ZemzemeMessage
+import com.roman.zemzeme.model.ZemzemeMessageType
 
 /**
  * Utilities for building human-friendly notification text/previews.
@@ -15,12 +15,12 @@ object NotificationTextUtils {
      * - File (pdf): "📄 file.pdf"
      * - Text: original message content
      */
-    fun buildPrivateMessagePreview(message: BitchatMessage): String {
+    fun buildPrivateMessagePreview(message: ZemzemeMessage): String {
         return try {
             when (message.type) {
-                BitchatMessageType.Image -> "📷 sent an image"
-                BitchatMessageType.Audio -> "🎤 sent a voice message"
-                BitchatMessageType.File -> {
+                ZemzemeMessageType.Image -> "📷 sent an image"
+                ZemzemeMessageType.Audio -> "🎤 sent a voice message"
+                ZemzemeMessageType.File -> {
                     // Show just the filename (not the full path)
                     val name = try { java.io.File(message.content).name } catch (_: Exception) { null }
                     if (!name.isNullOrBlank()) {

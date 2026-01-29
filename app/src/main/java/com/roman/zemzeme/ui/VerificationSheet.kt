@@ -72,7 +72,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roman.zemzeme.R
 import com.roman.zemzeme.core.ui.component.button.CloseButton
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
 import com.roman.zemzeme.services.VerificationService
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -109,7 +109,7 @@ fun VerificationSheet(
         viewModel.buildMyQRString(nickname, npub)
     }
 
-    BitchatBottomSheet(
+    ZemzemeBottomSheet(
         modifier = modifier,
         onDismissRequest = onDismiss,
     ) {

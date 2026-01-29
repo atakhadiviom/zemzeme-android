@@ -20,12 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.roman.zemzeme.R
 import com.roman.zemzeme.core.ui.component.button.CloseButton
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
 import com.roman.zemzeme.p2p.P2PConfig
 import com.roman.zemzeme.p2p.P2PTransport
 import com.roman.zemzeme.p2p.P2PNodeStatus
@@ -56,7 +58,7 @@ fun P2PSettingsSheet(
     // State
     val transportToggles by P2PConfig.transportTogglesFlow.collectAsState()
     val attachedMeshService by MeshServiceHolder.meshServiceFlow.collectAsState()
-    val transportRuntimeState by produceState<com.bitchat.android.mesh.BluetoothMeshService.TransportRuntimeState?>(
+    val transportRuntimeState by produceState<com.roman.zemzeme.mesh.BluetoothMeshService.TransportRuntimeState?>(
         initialValue = attachedMeshService?.transportRuntimeState?.value,
         key1 = attachedMeshService
     ) {
@@ -86,7 +88,7 @@ fun P2PSettingsSheet(
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
     
     if (isPresented) {
-        BitchatBottomSheet(
+        ZemzemeBottomSheet(
             modifier = modifier,
             onDismissRequest = onDismiss
         ) {
@@ -119,7 +121,7 @@ fun P2PSettingsSheet(
                                 color = colorScheme.onBackground
                             )
                             Text(
-                                text = "Direct peer-to-peer connections via libp2p",
+                                text = stringResource(R.string.about_p2p_subtitle),
                                 fontSize = 13.sp,
                                 color = colorScheme.onBackground.copy(alpha = 0.6f)
                             )
@@ -152,7 +154,7 @@ fun P2PSettingsSheet(
                                     ) {
                                         val statusColor = when {
                                             isUnhealthy -> Color(0xFFFF9500) // Orange for unhealthy
-                                            nodeStatus == P2PNodeStatus.RUNNING -> if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+                                            nodeStatus == P2PNodeStatus.RUNNING -> if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
                                             nodeStatus == P2PNodeStatus.STARTING -> Color(0xFFFF9500)
                                             else -> Color(0xFFFF3B30)
                                         }
@@ -269,7 +271,7 @@ fun P2PSettingsSheet(
                                     SettingsToggleRow(
                                         icon = Icons.Default.Wifi,
                                         title = "Enable P2P",
-                                        subtitle = "Connect directly to other BitChat peers",
+                                        subtitle = "Connect directly to other Zemzeme peers",
                                         checked = p2pEnabled,
                                         onCheckedChange = { enabled ->
                                             if (enabled && TorPreferenceManager.get(context) == TorMode.ON) {
@@ -291,8 +293,8 @@ fun P2PSettingsSheet(
                                                     }
                                                 } else {
                                                     val fallbackResult = if (enabled) {
-                                                        com.bitchat.android.nostr.NostrRelayManager.isEnabled = false
-                                                        com.bitchat.android.nostr.NostrRelayManager.getInstance(context).disconnect()
+                                                        com.roman.zemzeme.nostr.NostrRelayManager.isEnabled = false
+                                                        com.roman.zemzeme.nostr.NostrRelayManager.getInstance(context).disconnect()
                                                         p2pTransport.start()
                                                     } else {
                                                         p2pTransport.stop()
@@ -552,7 +554,7 @@ private fun SettingsToggleRow(
             enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D),
+                checkedTrackColor = if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D),
                 uncheckedThumbColor = Color.White,
                 uncheckedTrackColor = colorScheme.surfaceVariant
             )
@@ -578,7 +580,7 @@ fun P2PStatusIndicator(
     
     val statusColor = when (nodeStatus) {
         P2PNodeStatus.RUNNING -> if (connectedPeers.isNotEmpty()) {
-            if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D)
+            if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D)
         } else {
             Color(0xFFFF9500)
         }
@@ -644,7 +646,7 @@ fun TransportBadge(
     
     val (icon, label, color) = when (transport.lowercase()) {
         "ble" -> Triple(Icons.Default.Bluetooth, "BLE", if (isDark) Color(0xFF5AC8FA) else Color(0xFF007AFF))
-        "p2p" -> Triple(Icons.Default.Wifi, "P2P", if (isDark) Color(0xFF32D74B) else Color(0xFF248A3D))
+        "p2p" -> Triple(Icons.Default.Wifi, "P2P", if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D))
         "nostr" -> Triple(Icons.Default.Cloud, "Nostr", if (isDark) Color(0xFFFF9500) else Color(0xFFE65100))
         else -> Triple(Icons.Default.QuestionMark, "?", colorScheme.onSurface.copy(alpha = 0.5f))
     }

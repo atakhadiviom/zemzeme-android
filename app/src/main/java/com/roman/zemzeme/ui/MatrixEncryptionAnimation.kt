@@ -74,14 +74,14 @@ object PoWMiningTracker {
  */
 @Composable
 fun MessageWithMatrixAnimation(
-    message: com.bitchat.android.model.BitchatMessage,
-    messages: List<com.bitchat.android.model.BitchatMessage> = emptyList(),
+    message: com.roman.zemzeme.model.ZemzemeMessage,
+    messages: List<com.roman.zemzeme.model.ZemzemeMessage> = emptyList(),
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    meshService: com.roman.zemzeme.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme,
     timeFormatter: java.text.SimpleDateFormat,
     onNicknameClick: ((String) -> Unit)?,
-    onMessageLongPress: ((com.bitchat.android.model.BitchatMessage) -> Unit)?,
+    onMessageLongPress: ((com.roman.zemzeme.model.ZemzemeMessage) -> Unit)?,
     onImageClick: ((String, List<String>, Int) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
@@ -122,9 +122,9 @@ fun MessageWithMatrixAnimation(
  */
 @Composable
 private fun AnimatedMessageDisplay(
-    message: com.bitchat.android.model.BitchatMessage,
+    message: com.roman.zemzeme.model.ZemzemeMessage,
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    meshService: com.roman.zemzeme.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme,
     timeFormatter: java.text.SimpleDateFormat,
     modifier: Modifier = Modifier
@@ -239,9 +239,9 @@ private fun AnimatedMessageDisplay(
  * Identical to formatMessageAsAnnotatedString but excludes timestamp and PoW badge
  */
 private fun formatMessageAsAnnotatedStringWithoutTimestamp(
-    message: com.bitchat.android.model.BitchatMessage,
+    message: com.roman.zemzeme.model.ZemzemeMessage,
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    meshService: com.roman.zemzeme.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme
 ): AnnotatedString {
     // Get the full formatted text first

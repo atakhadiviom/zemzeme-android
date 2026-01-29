@@ -1,6 +1,6 @@
 package com.roman.zemzeme.ui
 
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.model.DeliveryStatus
 import com.roman.zemzeme.mesh.PeerFingerprintManager
 import java.security.MessageDigest
@@ -38,14 +38,14 @@ class PrivateChatManager(
     private val fingerprintManager = PeerFingerprintManager.getInstance()
 
     // Track received private messages that need read receipts
-    private val unreadReceivedMessages = mutableMapOf<String, MutableList<BitchatMessage>>()
+    private val unreadReceivedMessages = mutableMapOf<String, MutableList<ZemzemeMessage>>()
 
     // MARK: - Private Chat Lifecycle
 
     fun startPrivateChat(peerID: String, meshService: BluetoothMeshService): Boolean {
         if (isPeerBlocked(peerID)) {
             val peerNickname = getPeerNickname(peerID, meshService)
-            val systemMessage = BitchatMessage(
+            val systemMessage = ZemzemeMessage(
                 sender = "system",
                 content = "cannot start chat with $peerNickname: user is blocked.",
                 timestamp = Date(),
@@ -90,7 +90,7 @@ class PrivateChatManager(
         onSendMessage: (String, String, String, String) -> Unit
     ): Boolean {
         if (isPeerBlocked(peerID)) {
-            val systemMessage = BitchatMessage(
+            val systemMessage = ZemzemeMessage(
                 sender = "system",
                 content = "cannot send message to $recipientNickname: user is blocked.",
                 timestamp = Date(),
@@ -100,7 +100,7 @@ class PrivateChatManager(
             return false
         }
 
-        val message = BitchatMessage(
+        val message = ZemzemeMessage(
             sender = senderNickname ?: myPeerID,
             content = content,
             timestamp = Date(),
@@ -194,7 +194,7 @@ class PrivateChatManager(
             dataManager.addBlockedUser(fingerprint)
 
             val peerNickname = getPeerNickname(peerID, meshService)
-            val systemMessage = BitchatMessage(
+            val systemMessage = ZemzemeMessage(
                 sender = "system",
                 content = "blocked user $peerNickname",
                 timestamp = Date(),
@@ -218,7 +218,7 @@ class PrivateChatManager(
             dataManager.removeBlockedUser(fingerprint)
 
             val peerNickname = getPeerNickname(peerID, meshService)
-            val systemMessage = BitchatMessage(
+            val systemMessage = ZemzemeMessage(
                 sender = "system",
                 content = "unblocked user $peerNickname",
                 timestamp = Date(),
@@ -236,7 +236,7 @@ class PrivateChatManager(
         if (peerID != null) {
             return blockPeer(peerID, meshService)
         } else {
-            val systemMessage = BitchatMessage(
+            val systemMessage = ZemzemeMessage(
                 sender = "system",
                 content = "user '$targetName' not found",
                 timestamp = Date(),
@@ -255,7 +255,7 @@ class PrivateChatManager(
             if (fingerprint != null && dataManager.isUserBlocked(fingerprint)) {
                 return unblockPeer(peerID, meshService)
             } else {
-                val systemMessage = BitchatMessage(
+                val systemMessage = ZemzemeMessage(
                     sender = "system",
                     content = "user '$targetName' is not blocked",
                     timestamp = Date(),
@@ -265,7 +265,7 @@ class PrivateChatManager(
                 return false
             }
         } else {
-            val systemMessage = BitchatMessage(
+            val systemMessage = ZemzemeMessage(
                 sender = "system",
                 content = "user '$targetName' not found",
                 timestamp = Date(),
@@ -287,11 +287,11 @@ class PrivateChatManager(
 
     // MARK: - Message Handling
 
-    fun handleIncomingPrivateMessage(message: BitchatMessage) {
+    fun handleIncomingPrivateMessage(message: ZemzemeMessage) {
         handleIncomingPrivateMessage(message, suppressUnread = false)
     }
 
-    fun handleIncomingPrivateMessage(message: BitchatMessage, suppressUnread: Boolean) {
+    fun handleIncomingPrivateMessage(message: ZemzemeMessage, suppressUnread: Boolean) {
         val senderPeerID = message.senderPeerID
         if (senderPeerID != null) {
             // Mesh-origin private message: AppStateStore updates the list; avoid double-add here.
@@ -336,7 +336,7 @@ class PrivateChatManager(
      */
     fun sendReadReceiptsForPeer(peerID: String, meshService: BluetoothMeshService) {
         // Collect candidate messages: all incoming messages from this peer in the conversation
-        val chats = try { state.getPrivateChatsValue() } catch (_: Exception) { emptyMap<String, List<BitchatMessage>>() }
+        val chats = try { state.getPrivateChatsValue() } catch (_: Exception) { emptyMap<String, List<ZemzemeMessage>>() }
         val messages = chats[peerID].orEmpty()
 
         if (messages.isEmpty()) {
@@ -434,10 +434,10 @@ class PrivateChatManager(
         // If we know the sender's Nostr pubkey for this peer via favorites, derive temp key
         try {
             val noiseKeyBytes = targetPeerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-            val npub = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKeyBytes)
+            val npub = com.roman.zemzeme.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKeyBytes)
             if (npub != null) {
                 // Normalize to hex to match how we formed temp keys (nostr_<pub16>)
-                val (hrp, data) = com.bitchat.android.nostr.Bech32.decode(npub)
+                val (hrp, data) = com.roman.zemzeme.nostr.Bech32.decode(npub)
                 if (hrp == "npub") {
                     val pubHex = data.joinToString("") { "%02x".format(it) }
                     tryMergeKeys.add("nostr_${pubHex.take(16)}")

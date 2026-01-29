@@ -21,7 +21,7 @@ import androidx.core.content.edit
  * Encryption service that now uses NoiseEncryptionService internally
  * Maintains the same public API for backward compatibility
  * 
- * This is the main interface for all encryption/decryption operations in bitchat.
+ * This is the main interface for all encryption/decryption operations in zemzeme.
  * It now uses the Noise protocol for secure transport encryption with proper session management.
  */
 open class EncryptionService(private val context: Context) {
@@ -237,7 +237,7 @@ open class EncryptionService(private val context: Context) {
     /**
      * Get session state for a peer (for UI state display)
      */
-    fun getSessionState(peerID: String): com.bitchat.android.noise.NoiseSession.NoiseSessionState {
+    fun getSessionState(peerID: String): com.roman.zemzeme.noise.NoiseSession.NoiseSessionState {
         return noiseService.getSessionState(peerID)
     }
     

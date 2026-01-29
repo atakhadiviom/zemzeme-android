@@ -25,11 +25,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.ui.media.FullScreenImageViewer
-import com.roman.zemzeme.update.UpdateBanner
-import com.roman.zemzeme.update.UpdateManager
-import com.roman.zemzeme.update.UpdateReadyDialog
 
 /**
  * Main ChatScreen - REFACTORED to use component-based architecture
@@ -72,7 +69,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     var showLocationNotesSheet by remember { mutableStateOf(false) }
     var showUserSheet by remember { mutableStateOf(false) }
     var selectedUserForSheet by remember { mutableStateOf("") }
-    var selectedMessageForSheet by remember { mutableStateOf<BitchatMessage?>(null) }
+    var selectedMessageForSheet by remember { mutableStateOf<ZemzemeMessage?>(null) }
     var showFullScreenImageViewer by remember { mutableStateOf(false) }
     var viewerImagePaths by remember { mutableStateOf(emptyList<String>()) }
     var initialViewerIndex by remember { mutableStateOf(0) }
@@ -82,13 +79,6 @@ fun ChatScreen(viewModel: ChatViewModel) {
     // Show password dialog when needed
     LaunchedEffect(showPasswordPrompt) {
         showPasswordDialog = showPasswordPrompt
-    }
-
-    // Check for updates on app launch
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        val updateManager = UpdateManager.getInstance(context)
-        updateManager.checkForUpdate()
     }
 
     val isConnected by viewModel.isConnected.collectAsStateWithLifecycle()
@@ -103,7 +93,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         currentChannel != null -> channelMessages[currentChannel] ?: emptyList()
         else -> {
             val locationChannel = selectedLocationChannel
-            if (locationChannel is com.bitchat.android.geohash.ChannelID.Location) {
+            if (locationChannel is com.roman.zemzeme.geohash.ChannelID.Location) {
                 val geokey = "geo:${locationChannel.channel.geohash}"
                 channelMessages[geokey] ?: emptyList()
             } else {
@@ -115,7 +105,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     // Determine whether to show media buttons (only hide in geohash location chats)
     val showMediaButtons = when {
         currentChannel != null -> true
-        else -> selectedLocationChannel !is com.bitchat.android.geohash.ChannelID.Location
+        else -> selectedLocationChannel !is com.roman.zemzeme.geohash.ChannelID.Location
     }
 
     // Use WindowInsets to handle keyboard properly
@@ -125,10 +115,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
             .background(colorScheme.background) // Extend background to fill entire screen including status bar
     ) {
         val headerHeight = 42.dp
-        
-        // Update ready dialog - pops up when download completes
-        UpdateReadyDialog()
-        
+
         // Main content area that responds to keyboard/window insets
         Column(
             modifier = Modifier
@@ -142,9 +129,6 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     .windowInsetsPadding(WindowInsets.statusBars)
                     .height(headerHeight)
             )
-
-            // Update banner - shows download progress / install prompt
-            UpdateBanner()
 
             // Messages area - takes up available space, will compress when keyboard appears
             MessagesList(
@@ -163,7 +147,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     
                     // Check if we're in a geohash channel to include hash suffix
                     val selectedLocationChannel = viewModel.selectedLocationChannel.value
-                    val mentionText = if (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location && hashSuffix.isNotEmpty()) {
+                    val mentionText = if (selectedLocationChannel is com.roman.zemzeme.geohash.ChannelID.Location && hashSuffix.isNotEmpty()) {
                         // In geohash chat - include the hash suffix from the full display name
                         "@$baseName$hashSuffix"
                     } else {
@@ -202,7 +186,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
             // Input area - stays at bottom
         // Bridge file share from lower-level input to ViewModel
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        com.bitchat.android.ui.events.FileShareDispatcher.setHandler { peer, channel, path ->
+        com.roman.zemzeme.ui.events.FileShareDispatcher.setHandler { peer, channel, path ->
             viewModel.sendFileNote(peer, channel, path)
         }
     }
@@ -299,13 +283,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 color = colorScheme.background,
                 tonalElevation = 3.dp,
                 shadowElevation = 6.dp,
-                border = BorderStroke(2.dp, Color(0xFF00C851))
+                border = BorderStroke(2.dp, Color(0xFF00F5FF))
             ) {
                 IconButton(onClick = { forceScrollToBottom = !forceScrollToBottom }) {
                     Icon(
                         imageVector = Icons.Filled.ArrowDownward,
-                        contentDescription = stringResource(com.bitchat.android.R.string.cd_scroll_to_bottom),
-                        tint = Color(0xFF00C851)
+                        contentDescription = stringResource(com.roman.zemzeme.R.string.cd_scroll_to_bottom),
+                        tint = Color(0xFF00F5FF)
                     )
                 }
             }
@@ -439,7 +423,7 @@ private fun ChatFloatingHeader(
     onLocationNotesClick: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val locationManager = remember { com.bitchat.android.geohash.LocationChannelManager.getInstance(context) }
+    val locationManager = remember { com.roman.zemzeme.geohash.LocationChannelManager.getInstance(context) }
     
     Surface(
         modifier = Modifier
@@ -498,7 +482,7 @@ private fun ChatDialogs(
     showUserSheet: Boolean,
     onUserSheetDismiss: () -> Unit,
     selectedUserForSheet: String,
-    selectedMessageForSheet: BitchatMessage?,
+    selectedMessageForSheet: ZemzemeMessage?,
     viewModel: ChatViewModel,
     showVerificationSheet: Boolean,
     onVerificationSheetDismiss: () -> Unit,
@@ -527,7 +511,7 @@ private fun ChatDialogs(
         onShowDebug = { showDebugSheet = true }
     )
     if (showDebugSheet) {
-        com.bitchat.android.ui.debug.DebugSettingsSheet(
+        com.roman.zemzeme.ui.debug.DebugSettingsSheet(
             isPresented = showDebugSheet,
             onDismiss = { showDebugSheet = false },
             meshService = viewModel.meshService

@@ -27,7 +27,7 @@ import com.roman.zemzeme.R
 
 /**
  * Permission explanation screen shown before requesting permissions
- * Explains why bitchat needs each permission and reassures users about privacy
+ * Explains why zemzeme needs each permission and reassures users about privacy
  */
 @Composable
 fun PermissionExplanationScreen(
@@ -186,7 +186,7 @@ private fun PermissionCategoryCard(
     ) {
         Icon(
             imageVector = getPermissionIcon(category.type),
-            contentDescription = category.type.nameValue,
+            contentDescription = stringResource(category.type.nameRes),
             tint = colorScheme.primary,
             modifier = Modifier
                 .padding(top = 2.dp)
@@ -195,7 +195,7 @@ private fun PermissionCategoryCard(
         Spacer(modifier = Modifier.width(16.dp))
         Column {
             Text(
-                text = category.type.nameValue,
+                text = stringResource(category.type.nameRes),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
                 color = colorScheme.onBackground

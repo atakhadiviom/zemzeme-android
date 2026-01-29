@@ -11,9 +11,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTopBar
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTitle
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetTopBar
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetTitle
 import com.roman.zemzeme.geohash.GeohashChannelLevel
 import com.roman.zemzeme.geohash.LocationChannelManager
 import com.roman.zemzeme.R
@@ -70,7 +70,7 @@ fun LocationNotesSheetPresenter(
 private fun LocationNotesAcquiringSheet(
     onDismiss: () -> Unit
 ) {
-    BitchatBottomSheet(
+    ZemzemeBottomSheet(
         onDismissRequest = onDismiss,
     ) {
         Column(
@@ -108,7 +108,7 @@ private fun LocationNotesErrorSheet(
     onDismiss: () -> Unit,
     locationManager: LocationChannelManager
 ) {
-    BitchatBottomSheet(
+    ZemzemeBottomSheet(
         onDismissRequest = onDismiss,
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -143,11 +143,11 @@ private fun LocationNotesErrorSheet(
                 }
             }
 
-            BitchatSheetTopBar(
+            ZemzemeSheetTopBar(
                 onClose = onDismiss,
                 modifier = Modifier.align(Alignment.TopCenter),
                 title = {
-                    BitchatSheetTitle(
+                    ZemzemeSheetTitle(
                         text = stringResource(R.string.cd_location_notes).uppercase()
                     )
                 }

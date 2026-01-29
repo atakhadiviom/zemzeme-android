@@ -48,11 +48,7 @@
     
     <!-- Battery optimization permission -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    
-    <!-- Permissions for self-update (API 31+ silent updates) -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
-    
+
     <!-- Hardware features -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
@@ -63,7 +59,7 @@
         android:protectionLevel="signature" />
 
     <application
-        android:name=".BitchatApplication"
+        android:name=".ZemzemeApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -71,7 +67,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Zemzeme"
+        android:theme="@style/Theme.ZemzemeAndroid"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <!-- FileProvider for sharing temp/cache files with external viewers -->
@@ -87,13 +83,13 @@
         <activity
             android:name=".ui.GeohashPickerActivity"
             android:exported="false"
-            android:theme="@style/Theme.Zemzeme"
+            android:theme="@style/Theme.ZemzemeAndroid"
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.Zemzeme"
+            android:theme="@style/Theme.ZemzemeAndroid"
             android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTop">
             <intent-filter>
@@ -104,7 +100,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="bitchat" android:host="verify" />
+                <data android:scheme="zemzeme" android:host="verify" />
             </intent-filter>
         </activity>
 
@@ -136,10 +132,5 @@
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-
-        <!-- Receiver for self-update installation status -->
-        <receiver
-            android:name=".update.UpdateReceiver"
-            android:exported="false" />
     </application>
 </manifest>

@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BitchatBottomSheet(
+fun ZemzemeBottomSheet(
     modifier: Modifier = Modifier,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     onDismissRequest: () -> Unit,

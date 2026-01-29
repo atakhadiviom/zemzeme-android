@@ -77,7 +77,7 @@ class GeohashViewModel(
     private var currentDmSubId: String? = null
     private var geoTimer: Job? = null
     private var globalPresenceJob: Job? = null
-    private var locationChannelManager: com.bitchat.android.geohash.LocationChannelManager? = null
+    private var locationChannelManager: com.roman.zemzeme.geohash.LocationChannelManager? = null
     private var locationSelectedChannelJob: Job? = null
     private var locationTeleportedJob: Job? = null
     
@@ -95,10 +95,10 @@ class GeohashViewModel(
 
     val geohashPeople: StateFlow<List<GeoPerson>> = state.geohashPeople
     val geohashParticipantCounts: StateFlow<Map<String, Int>> = state.geohashParticipantCounts
-    val selectedLocationChannel: StateFlow<com.bitchat.android.geohash.ChannelID?> = state.selectedLocationChannel
+    val selectedLocationChannel: StateFlow<com.roman.zemzeme.geohash.ChannelID?> = state.selectedLocationChannel
     
     // P2P topic states for connection status UI
-    val p2pTopicStates: StateFlow<Map<String, com.bitchat.android.p2p.TopicState>> = p2pTopicsRepository.topicStates
+    val p2pTopicStates: StateFlow<Map<String, com.roman.zemzeme.p2p.TopicState>> = p2pTopicsRepository.topicStates
 
     fun initialize() {
         // Cancel location-state collectors before re-registering them.
@@ -132,7 +132,7 @@ class GeohashViewModel(
             )
         }
         try {
-            locationChannelManager = com.bitchat.android.geohash.LocationChannelManager.getInstance(getApplication())
+            locationChannelManager = com.roman.zemzeme.geohash.LocationChannelManager.getInstance(getApplication())
             locationSelectedChannelJob = viewModelScope.launch {
                 locationChannelManager?.selectedChannel?.collect { channel ->
                     state.setSelectedLocationChannel(channel)
@@ -172,7 +172,7 @@ class GeohashViewModel(
                 p2pTransport.p2pRepository.nodeStatus.collect { status ->
                     if (status == P2PNodeStatus.RUNNING) {
                         val currentChannel = state.selectedLocationChannel.value
-                        if (currentChannel is com.bitchat.android.geohash.ChannelID.Location && p2pConfig.p2pEnabled) {
+                        if (currentChannel is com.roman.zemzeme.geohash.ChannelID.Location && p2pConfig.p2pEnabled) {
                             val geohash = currentChannel.channel.geohash
                             val topicName = p2pMainTopicName(geohash)
                             val metaTopicName = p2pMetaTopicName(geohash)
@@ -205,7 +205,7 @@ class GeohashViewModel(
             p2pTopicStatesJob = viewModelScope.launch {
                 p2pTopicsRepository.topicStates.collect { topicStates ->
                     val currentChannel = state.selectedLocationChannel.value
-                    if (currentChannel is com.bitchat.android.geohash.ChannelID.Location) {
+                    if (currentChannel is com.roman.zemzeme.geohash.ChannelID.Location) {
                         val geohash = currentChannel.channel.geohash
                         val topicName = p2pMainTopicName(geohash)
                         val metaTopicName = p2pMetaTopicName(geohash)
@@ -257,7 +257,7 @@ class GeohashViewModel(
             
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize location channel state: ${e.message}")
-            state.setSelectedLocationChannel(com.bitchat.android.geohash.ChannelID.Mesh)
+            state.setSelectedLocationChannel(com.roman.zemzeme.geohash.ChannelID.Mesh)
             state.setIsTeleported(false)
         }
     }
@@ -347,12 +347,12 @@ class GeohashViewModel(
         }
     }
 
-    fun sendGeohashMessage(content: String, channel: com.bitchat.android.geohash.GeohashChannel, myPeerID: String, nickname: String?) {
+    fun sendGeohashMessage(content: String, channel: com.roman.zemzeme.geohash.GeohashChannel, myPeerID: String, nickname: String?) {
         viewModelScope.launch {
             try {
                 val tempId = "temp_${System.currentTimeMillis()}_${kotlin.random.Random.nextInt(1000)}"
                 val pow = PoWPreferenceManager.getCurrentSettings()
-                val localMsg = com.bitchat.android.model.BitchatMessage(
+                val localMsg = com.roman.zemzeme.model.ZemzemeMessage(
                     id = tempId,
                     sender = nickname ?: myPeerID,
                     content = content,
@@ -365,7 +365,7 @@ class GeohashViewModel(
                 messageManager.addChannelMessage("geo:${channel.geohash}", localMsg)
                 val startedMining = pow.enabled && pow.difficulty > 0
                 if (startedMining) {
-                    com.bitchat.android.ui.PoWMiningTracker.startMiningMessage(tempId)
+                    com.roman.zemzeme.ui.PoWMiningTracker.startMiningMessage(tempId)
                 }
                 
                 var sentViaP2P = false
@@ -397,18 +397,18 @@ class GeohashViewModel(
                     } finally {
                         // Ensure we stop the per-message mining animation regardless of success/failure
                         if (startedMining) {
-                            com.bitchat.android.ui.PoWMiningTracker.stopMiningMessage(tempId)
+                            com.roman.zemzeme.ui.PoWMiningTracker.stopMiningMessage(tempId)
                         }
                     }
                 } else if (!sentViaP2P) {
                     Log.w(TAG, "No transport available for geohash message (P2P: ${p2pConfig.p2pEnabled}, Nostr: ${p2pConfig.nostrEnabled})")
                     if (startedMining) {
-                        com.bitchat.android.ui.PoWMiningTracker.stopMiningMessage(tempId)
+                        com.roman.zemzeme.ui.PoWMiningTracker.stopMiningMessage(tempId)
                     }
                 } else {
                     // Sent via P2P only, stop mining tracker
                     if (startedMining) {
-                        com.bitchat.android.ui.PoWMiningTracker.stopMiningMessage(tempId)
+                        com.roman.zemzeme.ui.PoWMiningTracker.stopMiningMessage(tempId)
                     }
                 }
             } catch (e: Exception) {
@@ -446,7 +446,7 @@ class GeohashViewModel(
         repo.putNostrKeyMapping(convKey, pubkeyHex)
         // Record the conversation's geohash using the currently selected location channel (if any)
         val current = state.selectedLocationChannel.value
-        val gh = (current as? com.bitchat.android.geohash.ChannelID.Location)?.channel?.geohash
+        val gh = (current as? com.roman.zemzeme.geohash.ChannelID.Location)?.channel?.geohash
         if (!gh.isNullOrEmpty()) {
             repo.setConversationGeohash(convKey, gh)
             GeohashConversationRegistry.set(convKey, gh)
@@ -464,7 +464,7 @@ class GeohashViewModel(
             // Refresh people list and counts to remove blocked entry immediately
             repo.refreshGeohashPeople()
             repo.updateReactiveParticipantCounts()
-            val sysMsg = com.bitchat.android.model.BitchatMessage(
+            val sysMsg = com.roman.zemzeme.model.ZemzemeMessage(
                 sender = "system",
                 content = "blocked $targetNickname in geohash channels",
                 timestamp = Date(),
@@ -472,7 +472,7 @@ class GeohashViewModel(
             )
             messageManager.addMessage(sysMsg)
         } else {
-            val sysMsg = com.bitchat.android.model.BitchatMessage(
+            val sysMsg = com.roman.zemzeme.model.ZemzemeMessage(
                 sender = "system",
                 content = "user '$targetNickname' not found in current geohash",
                 timestamp = Date(),
@@ -482,7 +482,7 @@ class GeohashViewModel(
         }
     }
 
-    fun selectLocationChannel(channel: com.bitchat.android.geohash.ChannelID) {
+    fun selectLocationChannel(channel: com.roman.zemzeme.geohash.ChannelID) {
         locationChannelManager?.select(channel) ?: run { Log.w(TAG, "Cannot select location channel - not initialized") }
     }
 
@@ -500,7 +500,7 @@ class GeohashViewModel(
      */
     fun refreshP2PPeers() {
         val channel = state.selectedLocationChannel.value
-        if (channel is com.bitchat.android.geohash.ChannelID.Location &&
+        if (channel is com.roman.zemzeme.geohash.ChannelID.Location &&
             p2pConfig.p2pEnabled &&
             p2pTransport.p2pRepository.nodeStatus.value == P2PNodeStatus.RUNNING) {
             viewModelScope.launch(Dispatchers.IO) {
@@ -519,9 +519,9 @@ class GeohashViewModel(
     /**
      * Get the current P2P topic state for the selected geohash channel.
      */
-    fun getP2PTopicState(): com.bitchat.android.p2p.TopicState? {
+    fun getP2PTopicState(): com.roman.zemzeme.p2p.TopicState? {
         val channel = state.selectedLocationChannel.value
-        if (channel is com.bitchat.android.geohash.ChannelID.Location) {
+        if (channel is com.roman.zemzeme.geohash.ChannelID.Location) {
             return p2pTopicsRepository.getTopicState(p2pMainTopicName(channel.channel.geohash))
         }
         return null
@@ -532,7 +532,7 @@ class GeohashViewModel(
      */
     fun getP2PTopicPeers(): List<String> {
         val channel = state.selectedLocationChannel.value
-        if (channel is com.bitchat.android.geohash.ChannelID.Location) {
+        if (channel is com.roman.zemzeme.geohash.ChannelID.Location) {
             return p2pTopicsRepository.getPeersForTopic(p2pMainTopicName(channel.channel.geohash))
         }
         return emptyList()
@@ -566,7 +566,7 @@ class GeohashViewModel(
      */
     fun broadcastP2PPresenceForCurrentChannel(nickname: String, force: Boolean = false) {
         val channel = state.selectedLocationChannel.value
-        if (channel is com.bitchat.android.geohash.ChannelID.Location &&
+        if (channel is com.roman.zemzeme.geohash.ChannelID.Location &&
             p2pConfig.p2pEnabled &&
             p2pTransport.p2pRepository.nodeStatus.value == P2PNodeStatus.RUNNING) {
             val geohash = channel.channel.geohash
@@ -608,7 +608,7 @@ class GeohashViewModel(
         }
     }
 
-    private fun switchLocationChannel(channel: com.bitchat.android.geohash.ChannelID?) {
+    private fun switchLocationChannel(channel: com.roman.zemzeme.geohash.ChannelID?) {
         val previousGeohash = repo.getCurrentGeohash()
 
         geoTimer?.cancel(); geoTimer = null
@@ -619,7 +619,7 @@ class GeohashViewModel(
         p2pTopicsRepository.stopContinuousRefresh()
 
         when (channel) {
-            is com.bitchat.android.geohash.ChannelID.Mesh -> {
+            is com.roman.zemzeme.geohash.ChannelID.Mesh -> {
                 Log.d(TAG, "📡 Switched to mesh channel")
                 if (previousGeohash != null) {
                     repo.syncConnectedP2PPeers(previousGeohash, emptyList())
@@ -630,7 +630,7 @@ class GeohashViewModel(
                 notificationManager.clearMeshMentionNotifications()
                 repo.refreshGeohashPeople()
             }
-            is com.bitchat.android.geohash.ChannelID.Location -> {
+            is com.roman.zemzeme.geohash.ChannelID.Location -> {
                 Log.d(TAG, "📍 Switching to geohash channel: ${channel.channel.geohash}")
                 if (previousGeohash != null && previousGeohash != channel.channel.geohash) {
                     repo.syncConnectedP2PPeers(previousGeohash, emptyList())
@@ -848,7 +848,7 @@ class GeohashViewModel(
 
             Log.d(TAG, "Received P2P geohash message from $displayName in geo:$geohash")
 
-            val bitchatMessage = com.bitchat.android.model.BitchatMessage(
+            val zemzemeMessage = com.roman.zemzeme.model.ZemzemeMessage(
                 id = messageId,
                 sender = displayName,
                 content = messageContent,
@@ -860,7 +860,7 @@ class GeohashViewModel(
             )
 
             withContext(Dispatchers.Main) {
-                messageManager.addChannelMessage("geo:$geohash", bitchatMessage)
+                messageManager.addChannelMessage("geo:$geohash", zemzemeMessage)
             }
 
             repo.updateParticipant(geohash, participantId, Date(timestamp))
@@ -881,7 +881,7 @@ class GeohashViewModel(
 
         Log.d(TAG, "Received P2P geohash message from $displayName in geo:$geohash")
 
-        val bitchatMessage = com.bitchat.android.model.BitchatMessage(
+        val zemzemeMessage = com.roman.zemzeme.model.ZemzemeMessage(
             id = messageId,
             sender = displayName,
             content = rawContent,
@@ -893,7 +893,7 @@ class GeohashViewModel(
         )
 
         withContext(Dispatchers.Main) {
-            messageManager.addChannelMessage("geo:$geohash", bitchatMessage)
+            messageManager.addChannelMessage("geo:$geohash", zemzemeMessage)
         }
         repo.updateParticipant(geohash, participantId, Date(timestamp))
     }

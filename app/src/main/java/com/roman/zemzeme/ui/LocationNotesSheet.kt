@@ -26,9 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.roman.zemzeme.core.ui.component.sheet.BitchatBottomSheet
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTopBar
-import com.roman.zemzeme.core.ui.component.sheet.BitchatSheetTitle
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeBottomSheet
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetTopBar
+import com.roman.zemzeme.core.ui.component.sheet.ZemzemeSheetTitle
 import com.roman.zemzeme.geohash.GeohashChannelLevel
 import com.roman.zemzeme.geohash.LocationChannelManager
 import com.roman.zemzeme.nostr.LocationNotesManager
@@ -37,7 +37,7 @@ import java.util.*
 import java.util.Calendar
 
 /**
- * Location Notes Sheet - EXACT iOS UI match for bitchat
+ * Location Notes Sheet - EXACT iOS UI match for zemzeme
  * Matches iOS LocationNotesView.swift exactly in style, colors, fonts, and text
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,7 +101,7 @@ fun LocationNotesSheet(
         }
     }
 
-    BitchatBottomSheet(
+    ZemzemeBottomSheet(
         onDismissRequest = onDismiss,
         modifier = modifier,
     ) {
@@ -163,11 +163,11 @@ fun LocationNotesSheet(
             }
 
             // TopBar (animated)
-            BitchatSheetTopBar(
+            ZemzemeSheetTopBar(
                 onClose = onDismiss,
                 modifier = Modifier.align(Alignment.TopCenter),
                 title = {
-                    BitchatSheetTitle(
+                    ZemzemeSheetTitle(
                         text = pluralStringResource(
                             id = R.plurals.location_notes_title,
                             count = count,

@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Unified Message Router for BitChat
+ * Unified Message Router for Zemzeme
  * 
  * Coordinates message delivery across multiple transports with automatic fallback:
  * 1. BLE Mesh (local proximity) - fastest, no internet required
@@ -141,7 +141,7 @@ class UnifiedMessageRouter(
             
             val result = p2pTransport.sendPrivateMessage(
                 content = content,
-                recipientBitchatID = recipientPeerID,
+                recipientZemzemeID = recipientPeerID,
                 recipientNickname = recipientNickname,
                 messageID = messageID,
                 senderNickname = senderNickname

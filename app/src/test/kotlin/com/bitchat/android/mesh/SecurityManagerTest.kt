@@ -3,7 +3,7 @@ package com.roman.zemzeme.mesh
 import android.os.Build
 import com.roman.zemzeme.crypto.EncryptionService
 import com.roman.zemzeme.model.IdentityAnnouncement
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.protocol.MessageType
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -77,7 +77,7 @@ class SecurityManagerTest {
 
     @Test
     fun `validatePacket - rejects packet with missing signature`() {
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.MESSAGE.value,
             ttl = 10u,
             senderID = otherPeerID,
@@ -94,7 +94,7 @@ class SecurityManagerTest {
     fun `validatePacket - rejects packet with invalid signature`() {
         setupKnownPeer(otherPeerID, otherSigningKey)
         
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.MESSAGE.value,
             ttl = 10u,
             senderID = otherPeerID,
@@ -111,7 +111,7 @@ class SecurityManagerTest {
     fun `validatePacket - rejects packet from unknown peer (no key)`() {
         whenever(mockDelegate.getPeerInfo(unknownPeerID)).thenReturn(null)
         
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.MESSAGE.value,
             ttl = 10u,
             senderID = unknownPeerID,
@@ -128,7 +128,7 @@ class SecurityManagerTest {
     fun `validatePacket - accepts packet with valid signature from known peer`() {
         setupKnownPeer(otherPeerID, otherSigningKey)
         
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.MESSAGE.value,
             ttl = 10u,
             senderID = otherPeerID,
@@ -150,7 +150,7 @@ class SecurityManagerTest {
         )
         val payload = announcement.encode()!!
         
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.ANNOUNCE.value,
             ttl = 10u,
             senderID = unknownPeerID,
@@ -177,7 +177,7 @@ class SecurityManagerTest {
         )
         val payload = announcement.encode()!!
         
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.ANNOUNCE.value,
             ttl = 10u,
             senderID = unknownPeerID,
@@ -192,7 +192,7 @@ class SecurityManagerTest {
     
     @Test
     fun `validatePacket - rejects ANNOUNCE packet with malformed payload`() {
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.ANNOUNCE.value,
             ttl = 10u,
             senderID = unknownPeerID,
@@ -207,7 +207,7 @@ class SecurityManagerTest {
 
     @Test
     fun `validatePacket - ignores own packets`() {
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.MESSAGE.value,
             ttl = 10u,
             senderID = myPeerID,
@@ -224,7 +224,7 @@ class SecurityManagerTest {
     fun `validatePacket - detects duplicates`() {
         setupKnownPeer(otherPeerID, otherSigningKey)
         
-        val packet = BitchatPacket(
+        val packet = ZemzemePacket(
             type = MessageType.MESSAGE.value,
             ttl = 10u,
             senderID = otherPeerID,
@@ -249,9 +249,9 @@ class SecurityManagerTest {
         val payload = announcement.encode()!!
         
         // 1. Initial Announce (Fresh)
-        val packet1 = BitchatPacket(
+        val packet1 = ZemzemePacket(
             type = MessageType.ANNOUNCE.value,
-            ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS, // 7u
+            ttl = com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS, // 7u
             senderID = unknownPeerID,
             payload = payload
         )
@@ -262,11 +262,11 @@ class SecurityManagerTest {
         assertTrue("First ANNOUNCE should be accepted", securityManager.validatePacket(packet1, unknownPeerID))
         
         // 2. Relayed Duplicate (Lower TTL)
-        val packet2 = packet1.copy(ttl = (com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS - 1u).toUByte())
+        val packet2 = packet1.copy(ttl = (com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS - 1u).toUByte())
         assertFalse("Relayed duplicate ANNOUNCE should be rejected", securityManager.validatePacket(packet2, unknownPeerID))
         
         // 3. Direct Duplicate (Max TTL)
-        val packet3 = packet1.copy(ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS)
+        val packet3 = packet1.copy(ttl = com.roman.zemzeme.util.AppConstants.MESSAGE_TTL_HOPS)
         assertTrue("Fresh duplicate ANNOUNCE should be accepted", securityManager.validatePacket(packet3, unknownPeerID))
     }
 

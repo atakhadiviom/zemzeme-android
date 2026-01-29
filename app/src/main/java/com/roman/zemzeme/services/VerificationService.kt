@@ -15,8 +15,8 @@ import java.lang.ref.WeakReference
  * QR verification helpers: schema, signing, and basic challenge/response helpers.
  */
 object VerificationService {
-    private const val CONTEXT = "bitchat-verify-v1"
-    private const val RESPONSE_CONTEXT = "bitchat-verify-resp-v1"
+    private const val CONTEXT = "zemzeme-verify-v1"
+    private const val RESPONSE_CONTEXT = "zemzeme-verify-resp-v1"
 
     private var encryptionServiceRef: WeakReference<EncryptionService>? = null
 
@@ -57,7 +57,7 @@ object VerificationService {
 
         fun toUrlString(): String {
             val builder = Uri.Builder()
-                .scheme("bitchat")
+                .scheme("zemzeme")
                 .authority("verify")
                 .appendQueryParameter("v", v.toString())
                 .appendQueryParameter("noise", noiseKeyHex)
@@ -75,7 +75,7 @@ object VerificationService {
         companion object {
             fun fromUrlString(urlString: String): VerificationQR? {
                 val uri = runCatching { urlString.toUri() }.getOrNull() ?: return null
-                if (uri.scheme != "bitchat" || uri.host != "verify") return null
+                if (uri.scheme != "zemzeme" || uri.host != "verify") return null
 
                 val vStr = uri.getQueryParameter("v") ?: return null
                 val v = vStr.toIntOrNull() ?: return null

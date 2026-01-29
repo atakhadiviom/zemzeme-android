@@ -103,9 +103,9 @@ fun GeohashPeopleList(
             // Get current geohash identity for "me" detection
             val myHex = remember(selectedLocationChannel) {
                 when (val channel = selectedLocationChannel) {
-                    is com.bitchat.android.geohash.ChannelID.Location -> {
+                    is com.roman.zemzeme.geohash.ChannelID.Location -> {
                         try {
-                            val identity = com.bitchat.android.nostr.NostrIdentityBridge.deriveIdentity(
+                            val identity = com.roman.zemzeme.nostr.NostrIdentityBridge.deriveIdentity(
                                 forGeohash = channel.channel.geohash,
                                 context = viewModel.getApplication()
                             )
@@ -143,7 +143,7 @@ fun GeohashPeopleList(
             val baseNameCounts = remember(geohashPeople) {
                 val counts = mutableMapOf<String, Int>()
                 geohashPeople.forEach { person ->
-                    val (b, _) = com.bitchat.android.ui.splitSuffix(person.displayName)
+                    val (b, _) = com.roman.zemzeme.ui.splitSuffix(person.displayName)
                     counts[b] = (counts[b] ?: 0) + 1
                 }
                 counts
@@ -162,7 +162,7 @@ fun GeohashPeopleList(
                     nickname = nickname,
                     colorScheme = colorScheme,
                     viewModel = viewModel,
-                    showHashSuffix = (baseNameCounts[com.bitchat.android.ui.splitSuffix(person.displayName).first] ?: 0) > 1,
+                    showHashSuffix = (baseNameCounts[com.roman.zemzeme.ui.splitSuffix(person.displayName).first] ?: 0) > 1,
                     onTap = {
                         if (person.id != myHex) {
                             if (person.id.startsWith("p2p:")) {
@@ -239,7 +239,7 @@ private fun GeohashPersonItem(
         Spacer(modifier = Modifier.width(8.dp))
         
         // Display name with suffix handling
-        val (baseNameRaw, suffixRaw) = com.bitchat.android.ui.splitSuffix(person.displayName)
+        val (baseNameRaw, suffixRaw) = com.roman.zemzeme.ui.splitSuffix(person.displayName)
         val baseName = truncateNickname(baseNameRaw)
         val suffix = if (showHashSuffix) suffixRaw else ""
         
@@ -295,14 +295,14 @@ private fun GeohashPersonItem(
                     Spacer(modifier = Modifier.width(4.dp))
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFF00C851).copy(alpha = 0.2f)
+                        color = Color(0xFF00F5FF).copy(alpha = 0.2f)
                     ) {
                         Text(
                             text = "P2P",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 9.sp
                             ),
-                            color = Color(0xFF00C851),
+                            color = Color(0xFF00F5FF),
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }

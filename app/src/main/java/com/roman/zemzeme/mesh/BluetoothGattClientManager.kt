@@ -8,7 +8,7 @@ import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.os.ParcelUuid
 import android.util.Log
-import com.roman.zemzeme.protocol.BitchatPacket
+import com.roman.zemzeme.protocol.ZemzemePacket
 import com.roman.zemzeme.util.AppConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -76,7 +76,7 @@ class BluetoothGattClientManager(
     fun start(): Boolean {
         // Respect debug setting
         try {
-            if (!com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value) {
+            if (!com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value) {
                 Log.i(TAG, "Client start skipped: GATT Client disabled in debug settings")
                 return false
             }
@@ -150,7 +150,7 @@ class BluetoothGattClientManager(
      * Handle scan state changes from power manager
      */
     fun onScanStateChanged(shouldScan: Boolean) {
-        val enabled = try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
+        val enabled = try { com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
         if (shouldScan && enabled) {
             startScanning()
         } else {
@@ -199,7 +199,7 @@ class BluetoothGattClientManager(
     @Suppress("DEPRECATION")
     private fun startScanning() {
         // Respect debug setting
-        val enabled = try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
+        val enabled = try { com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
         if (!permissionManager.hasBluetoothPermissions() || bleScanner == null || !isActive || !enabled) return
         
         // Rate limit scan starts to prevent "scanning too frequently" errors
@@ -382,7 +382,7 @@ class BluetoothGattClientManager(
         }
         
         // Check if connection limit is reached
-        val dbg = try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance() } catch (_: Exception) { null }
+        val dbg = try { com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance() } catch (_: Exception) { null }
         val maxOverall = dbg?.maxConnectionsOverall?.value ?: powerManager.getMaxConnections()
         val maxClient = dbg?.maxClientConnections?.value ?: maxOverall
 
@@ -405,7 +405,7 @@ class BluetoothGattClientManager(
         if (!permissionManager.hasBluetoothPermissions()) return
 
         val deviceAddress = device.address
-        Log.i(TAG, "Connecting to bitchat device: $deviceAddress (peerID: $peerID)")
+        Log.i(TAG, "Connecting to zemzeme device: $deviceAddress (peerID: $peerID)")
         
         val gattCallback = object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -513,7 +513,7 @@ class BluetoothGattClientManager(
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 val value = characteristic.value
                 Log.i(TAG, "Client: Received packet from ${gatt.device.address}, size: ${value.size} bytes")
-                val packet = BitchatPacket.fromBinaryData(value)
+                val packet = ZemzemePacket.fromBinaryData(value)
                 if (packet != null) {
                     val peerID = packet.senderID.take(8).toByteArray().joinToString("") { "%02x".format(it) }
                     Log.d(TAG, "Client: Parsed packet type ${packet.type} from $peerID")
@@ -562,7 +562,7 @@ class BluetoothGattClientManager(
      */
     fun restartScanning() {
         // Respect debug setting
-        val enabled = try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
+        val enabled = try { com.roman.zemzeme.ui.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
         if (!isActive || !enabled) return
         
         connectionScope.launch {

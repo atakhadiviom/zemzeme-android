@@ -6,9 +6,9 @@ import com.roman.zemzeme.ui.theme.ThemePreferenceManager
 import com.roman.zemzeme.net.ArtiTorManager
 
 /**
- * Main application class for bitchat Android
+ * Main application class for zemzeme Android
  */
-class BitchatApplication : Application() {
+class ZemzemeApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
@@ -23,41 +23,41 @@ class BitchatApplication : Application() {
         RelayDirectory.initialize(this)
 
         // Initialize LocationNotesManager dependencies early so sheet subscriptions can start immediately
-        try { com.bitchat.android.nostr.LocationNotesInitializer.initialize(this) } catch (_: Exception) { }
+        try { com.roman.zemzeme.nostr.LocationNotesInitializer.initialize(this) } catch (_: Exception) { }
 
         // Initialize favorites persistence early so MessageRouter/NostrTransport can use it on startup
         try {
-            com.bitchat.android.favorites.FavoritesPersistenceService.initialize(this)
+            com.roman.zemzeme.favorites.FavoritesPersistenceService.initialize(this)
         } catch (_: Exception) { }
 
         // Warm up Nostr identity to ensure npub is available for favorite notifications
         try {
-            com.bitchat.android.nostr.NostrIdentityBridge.getCurrentNostrIdentity(this)
+            com.roman.zemzeme.nostr.NostrIdentityBridge.getCurrentNostrIdentity(this)
         } catch (_: Exception) { }
 
         // Initialize theme preference
         ThemePreferenceManager.init(this)
 
         // Initialize debug preference manager (persists debug toggles)
-        try { com.bitchat.android.ui.debug.DebugPreferenceManager.init(this) } catch (_: Exception) { }
+        try { com.roman.zemzeme.ui.debug.DebugPreferenceManager.init(this) } catch (_: Exception) { }
 
         // Initialize Geohash Registries for persistence
         try {
-            com.bitchat.android.nostr.GeohashAliasRegistry.initialize(this)
-            com.bitchat.android.nostr.GeohashConversationRegistry.initialize(this)
+            com.roman.zemzeme.nostr.GeohashAliasRegistry.initialize(this)
+            com.roman.zemzeme.nostr.GeohashConversationRegistry.initialize(this)
         } catch (_: Exception) { }
 
         // Initialize P2P Alias Registry for P2P peer display name persistence
         try {
-            com.bitchat.android.p2p.P2PAliasRegistry.initialize(this)
-            com.bitchat.android.p2p.P2PFavoritesRegistry.initialize(this)
+            com.roman.zemzeme.p2p.P2PAliasRegistry.initialize(this)
+            com.roman.zemzeme.p2p.P2PFavoritesRegistry.initialize(this)
         } catch (_: Exception) { }
 
         // Initialize mesh service preferences
-        try { com.bitchat.android.service.MeshServicePreferences.init(this) } catch (_: Exception) { }
+        try { com.roman.zemzeme.service.MeshServicePreferences.init(this) } catch (_: Exception) { }
 
         // Proactively start the foreground service to keep mesh alive
-        try { com.bitchat.android.service.MeshForegroundService.start(this) } catch (_: Exception) { }
+        try { com.roman.zemzeme.service.MeshForegroundService.start(this) } catch (_: Exception) { }
 
         // TorManager already initialized above
     }

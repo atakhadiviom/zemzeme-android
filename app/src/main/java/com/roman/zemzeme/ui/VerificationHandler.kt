@@ -5,7 +5,7 @@ import com.roman.zemzeme.R
 import com.roman.zemzeme.favorites.FavoritesPersistenceService
 import com.roman.zemzeme.identity.SecureIdentityStateManager
 import com.roman.zemzeme.mesh.BluetoothMeshService
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.noise.NoiseSession
 import com.roman.zemzeme.nostr.GeohashAliasRegistry
 import com.roman.zemzeme.services.VerificationService
@@ -307,7 +307,7 @@ class VerificationHandler(
     }
 
     private fun addVerificationSystemMessage(peerID: String, text: String) {
-        val msg = BitchatMessage(
+        val msg = ZemzemeMessage(
             sender = "system",
             content = text,
             timestamp = Date(),

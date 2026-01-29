@@ -43,13 +43,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun TorStatusDot(
     modifier: Modifier = Modifier
 ) {
-    val torProvider = remember { com.bitchat.android.net.ArtiTorManager.getInstance() }
+    val torProvider = remember { com.roman.zemzeme.net.ArtiTorManager.getInstance() }
     val torStatus by torProvider.statusFlow.collectAsState()
     
-    if (torStatus.mode != com.bitchat.android.net.TorMode.OFF) {
+    if (torStatus.mode != com.roman.zemzeme.net.TorMode.OFF) {
         val dotColor = when {
             torStatus.running && torStatus.bootstrapPercent < 100 -> Color(0xFFFF9500) // Orange - bootstrapping
-            torStatus.running && torStatus.bootstrapPercent >= 100 -> Color(0xFF00C851) // Green - connected
+            torStatus.running && torStatus.bootstrapPercent >= 100 -> Color(0xFF00F5FF) // Green - connected
             else -> Color.Red // Red - error/disconnected
         }
         Canvas(
@@ -156,14 +156,14 @@ fun NicknameEditor(
  */
 @Composable
 fun P2PConnectionDot(
-    connectionState: com.bitchat.android.p2p.TopicConnectionState,
+    connectionState: com.roman.zemzeme.p2p.TopicConnectionState,
     modifier: Modifier = Modifier
 ) {
     val dotColor = when (connectionState) {
-        com.bitchat.android.p2p.TopicConnectionState.CONNECTING -> Color(0xFFFF9500) // Orange
-        com.bitchat.android.p2p.TopicConnectionState.CONNECTED -> Color(0xFF00C851) // Green
-        com.bitchat.android.p2p.TopicConnectionState.NO_PEERS -> Color(0xFFFF9500)
-        com.bitchat.android.p2p.TopicConnectionState.ERROR -> Color.Red
+        com.roman.zemzeme.p2p.TopicConnectionState.CONNECTING -> Color(0xFFFF9500) // Orange
+        com.roman.zemzeme.p2p.TopicConnectionState.CONNECTED -> Color(0xFF00F5FF) // Green
+        com.roman.zemzeme.p2p.TopicConnectionState.NO_PEERS -> Color(0xFFFF9500)
+        com.roman.zemzeme.p2p.TopicConnectionState.ERROR -> Color.Red
     }
     
     Canvas(
@@ -183,7 +183,7 @@ fun PeerCounter(
     joinedChannels: Set<String>,
     hasUnreadChannels: Map<String, Int>,
     isConnected: Boolean,
-    selectedLocationChannel: com.bitchat.android.geohash.ChannelID?,
+    selectedLocationChannel: com.roman.zemzeme.geohash.ChannelID?,
     geohashPeople: List<GeoPerson>,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -192,7 +192,7 @@ fun PeerCounter(
     
     // Compute channel-aware people count, display text, and color
     val (displayText, countColor) = when (selectedLocationChannel) {
-        is com.bitchat.android.geohash.ChannelID.Location -> {
+        is com.roman.zemzeme.geohash.ChannelID.Location -> {
             // Geohash channel: show geohash participants with P2P/Nostr split
             val nostrCount = geohashPeople.count { it.transport == TransportType.NOSTR }
             val p2pCount = geohashPeople.count { it.transport == TransportType.P2P }
@@ -205,7 +205,7 @@ fun PeerCounter(
                 "$totalCount"
             }
             
-            val green = Color(0xFF00C851)
+            val green = Color(0xFF00F5FF)
             val purple = Color(0xFF9C27B0)
             // Color: green if P2P, purple if only Nostr, gray if none
             val color = when {
@@ -215,7 +215,7 @@ fun PeerCounter(
             }
             Pair(text, color)
         }
-        is com.bitchat.android.geohash.ChannelID.Mesh,
+        is com.roman.zemzeme.geohash.ChannelID.Mesh,
         null -> {
             // Mesh channel: show Bluetooth-connected peers (excluding self)
             val count = connectedPeers.size
@@ -226,12 +226,12 @@ fun PeerCounter(
     
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.clickable { onClick() }.padding(end = 8.dp) // Added right margin to match "bitchat" logo spacing
+        modifier = modifier.clickable { onClick() }.padding(end = 8.dp) // Added right margin to match "zemzeme" logo spacing
     ) {
         Icon(
             imageVector = Icons.Default.Group,
             contentDescription = when (selectedLocationChannel) {
-                is com.bitchat.android.geohash.ChannelID.Location -> stringResource(R.string.cd_geohash_participants)
+                is com.roman.zemzeme.geohash.ChannelID.Location -> stringResource(R.string.cd_geohash_participants)
                 else -> stringResource(R.string.cd_connected_peers)
             },
             modifier = Modifier.size(16.dp),
@@ -251,7 +251,7 @@ fun PeerCounter(
             Text(
                 text = stringResource(R.string.channel_count_prefix) + "${joinedChannels.size}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isConnected) Color(0xFF00C851) else Color.Red,
+                color = if (isConnected) Color(0xFF00F5FF) else Color.Red,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -388,7 +388,7 @@ private fun MainHeader(
 
     // Bookmarks store for current geohash toggle (iOS parity)
     val context = androidx.compose.ui.platform.LocalContext.current
-    val bookmarksStore = remember { com.bitchat.android.geohash.GeohashBookmarksStore.getInstance(context) }
+    val bookmarksStore = remember { com.roman.zemzeme.geohash.GeohashBookmarksStore.getInstance(context) }
     val bookmarks by bookmarksStore.bookmarks.collectAsStateWithLifecycle()
 
     Row(
@@ -446,7 +446,7 @@ private fun MainHeader(
 
                 // Bookmark toggle for current geohash (not shown for mesh)
                 val currentGeohash: String? = when (val sc = selectedLocationChannel) {
-                    is com.bitchat.android.geohash.ChannelID.Location -> sc.channel.geohash
+                    is com.roman.zemzeme.geohash.ChannelID.Location -> sc.channel.geohash
                     else -> null
                 }
                 if (currentGeohash != null) {
@@ -461,7 +461,7 @@ private fun MainHeader(
                         Icon(
                             imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                             contentDescription = stringResource(R.string.cd_toggle_bookmark),
-                            tint = if (isBookmarked) Color(0xFF00C851) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                            tint = if (isBookmarked) Color(0xFF00F5FF) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -496,6 +496,19 @@ private fun MainHeader(
                 geohashPeople = geohashPeople,
                 onClick = onSidebarClick
             )
+
+            // Settings icon button
+            IconButton(
+                onClick = onTitleClick,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = stringResource(R.string.cd_settings),
+                    tint = colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
@@ -509,14 +522,14 @@ private fun LocationChannelsButton(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     // Ensure transport toggle flow is initialized from persisted prefs.
-    val transportConfig = remember { com.bitchat.android.p2p.P2PConfig(context) }
+    val transportConfig = remember { com.roman.zemzeme.p2p.P2PConfig(context) }
     val transportToggles by remember(transportConfig) {
-        com.bitchat.android.p2p.P2PConfig.transportTogglesFlow
+        com.roman.zemzeme.p2p.P2PConfig.transportTogglesFlow
     }.collectAsStateWithLifecycle()
     val p2pEnabled = transportToggles.p2pEnabled
     val nostrEnabled = transportToggles.nostrEnabled
 
-    val nostrRelayManager = remember { com.bitchat.android.nostr.NostrRelayManager.getInstance(context) }
+    val nostrRelayManager = remember { com.roman.zemzeme.nostr.NostrRelayManager.getInstance(context) }
     val nostrConnected by nostrRelayManager.isConnected.collectAsStateWithLifecycle()
     val nostrRelays by nostrRelayManager.relays.collectAsStateWithLifecycle()
 
@@ -528,19 +541,19 @@ private fun LocationChannelsButton(
     val p2pTopicStates by viewModel.p2pTopicStates.collectAsStateWithLifecycle()
 
     val (badgeText, badgeColor) = when (selectedChannel) {
-        is com.bitchat.android.geohash.ChannelID.Mesh -> {
+        is com.roman.zemzeme.geohash.ChannelID.Mesh -> {
             "#mesh" to Color(0xFF007AFF) // iOS blue for mesh
         }
-        is com.bitchat.android.geohash.ChannelID.Location -> {
-            val geohash = (selectedChannel as com.bitchat.android.geohash.ChannelID.Location).channel.geohash
-            "#$geohash" to Color(0xFF00C851) // Green for location
+        is com.roman.zemzeme.geohash.ChannelID.Location -> {
+            val geohash = (selectedChannel as com.roman.zemzeme.geohash.ChannelID.Location).channel.geohash
+            "#$geohash" to Color(0xFF00F5FF) // Green for location
         }
         null -> "#mesh" to Color(0xFF007AFF) // Default to mesh
     }
 
     // Get P2P connection state for current geohash channel
     val p2pConnectionState = when (val channel = selectedChannel) {
-        is com.bitchat.android.geohash.ChannelID.Location -> {
+        is com.roman.zemzeme.geohash.ChannelID.Location -> {
             if (p2pEnabled) {
                 val topicName = channel.channel.geohash
                 p2pTopicStates[topicName]?.connectionState
@@ -552,12 +565,12 @@ private fun LocationChannelsButton(
     }
 
     val nostrConnectionState = when (selectedChannel) {
-        is com.bitchat.android.geohash.ChannelID.Location -> {
+        is com.roman.zemzeme.geohash.ChannelID.Location -> {
             if (nostrEnabled) {
                 when {
-                    nostrConnected || nostrRelays.any { it.isConnected } -> com.bitchat.android.p2p.TopicConnectionState.CONNECTED
-                    nostrRelays.any { it.lastError != null } -> com.bitchat.android.p2p.TopicConnectionState.ERROR
-                    else -> com.bitchat.android.p2p.TopicConnectionState.CONNECTING
+                    nostrConnected || nostrRelays.any { it.isConnected } -> com.roman.zemzeme.p2p.TopicConnectionState.CONNECTED
+                    nostrRelays.any { it.lastError != null } -> com.roman.zemzeme.p2p.TopicConnectionState.ERROR
+                    else -> com.roman.zemzeme.p2p.TopicConnectionState.CONNECTING
                 }
             } else {
                 null
@@ -567,7 +580,7 @@ private fun LocationChannelsButton(
     }
 
     val transportConnectionState = p2pConnectionState ?: nostrConnectionState
-    val needsRefresh = p2pConnectionState == com.bitchat.android.p2p.TopicConnectionState.ERROR
+    val needsRefresh = p2pConnectionState == com.roman.zemzeme.p2p.TopicConnectionState.ERROR
 
     Button(
         onClick = onClick,

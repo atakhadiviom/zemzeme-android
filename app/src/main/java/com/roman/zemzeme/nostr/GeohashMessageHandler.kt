@@ -2,7 +2,7 @@ package com.roman.zemzeme.nostr
 
 import android.app.Application
 import android.util.Log
-import com.roman.zemzeme.model.BitchatMessage
+import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.ui.ChatState
 import com.roman.zemzeme.ui.MessageManager
 import kotlinx.coroutines.CoroutineScope
@@ -23,7 +23,7 @@ class GeohashMessageHandler(
     private val messageManager: MessageManager,
     private val repo: GeohashRepository,
     private val scope: CoroutineScope,
-    private val dataManager: com.bitchat.android.ui.DataManager
+    private val dataManager: com.roman.zemzeme.ui.DataManager
 ) {
     companion object { private const val TAG = "GeohashMessageHandler" }
 
@@ -85,7 +85,7 @@ class GeohashMessageHandler(
                 event.tags.find { it.size >= 2 && it[0] == "t" && it[1] == "teleport" }?.let { repo.markTeleported(event.pubkey) }
                 // Register a geohash DM alias for this participant so MessageRouter can route DMs via Nostr
                 try {
-                    com.bitchat.android.nostr.GeohashAliasRegistry.put("nostr_${event.pubkey.take(16)}", event.pubkey)
+                    com.roman.zemzeme.nostr.GeohashAliasRegistry.put("nostr_${event.pubkey.take(16)}", event.pubkey)
                 } catch (_: Exception) { }
 
                 // Stop here for presence events - they don't produce chat messages
@@ -97,7 +97,7 @@ class GeohashMessageHandler(
 
                 val senderName = repo.displayNameForNostrPubkeyUI(event.pubkey)
                 val hasNonce = try { NostrProofOfWork.hasNonce(event) } catch (_: Exception) { false }
-                val msg = BitchatMessage(
+                val msg = ZemzemeMessage(
                     id = event.id,
                     sender = senderName,
                     content = event.content,
