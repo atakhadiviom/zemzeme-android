@@ -17,6 +17,9 @@ import android.provider.Settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.AirplanemodeActive
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.IconButton
@@ -30,6 +33,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roman.zemzeme.geohash.isMeshView
 import com.roman.zemzeme.model.ZemzemeMessage
+import com.roman.zemzeme.onboarding.NetworkStatus
+import com.roman.zemzeme.onboarding.NetworkStatusManager
 import com.roman.zemzeme.ui.media.FullScreenImageViewer
 
 /**
@@ -92,6 +97,10 @@ fun ChatScreen(viewModel: ChatViewModel, isBluetoothEnabled: Boolean = true) {
     val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsStateWithLifecycle()
     val transportToggles by com.roman.zemzeme.p2p.P2PConfig.transportTogglesFlow.collectAsStateWithLifecycle()
     val isBleSettingEnabled = transportToggles.bleEnabled
+    val isP2PEnabled = transportToggles.p2pEnabled
+    val isNostrEnabled = transportToggles.nostrEnabled
+    val networkStatus by NetworkStatusManager.networkStatusFlow.collectAsStateWithLifecycle()
+    val isAirplaneModeOn by NetworkStatusManager.airplaneModeFlow.collectAsStateWithLifecycle()
 
     // Determine what messages to show based on current context (unified timelines)
     // Legacy private chat timeline removed - private chats now exclusively use PrivateChatSheet
@@ -141,6 +150,17 @@ fun ChatScreen(viewModel: ChatViewModel, isBluetoothEnabled: Boolean = true) {
                 BleMeshBanner(
                     isBluetoothEnabled = isBluetoothEnabled,
                     isBleSettingEnabled = isBleSettingEnabled,
+                    onOpenAppSettings = { viewModel.showAppInfo() }
+                )
+            }
+
+            // Network banner — shown in internet-requiring channels when no internet or no transport enabled
+            if (shouldShowNetworkBanner(networkStatus, isP2PEnabled, isNostrEnabled, currentChannel, selectedLocationChannel)) {
+                NetworkBanner(
+                    networkStatus = networkStatus,
+                    isP2PEnabled = isP2PEnabled,
+                    isNostrEnabled = isNostrEnabled,
+                    isAirplaneModeOn = isAirplaneModeOn,
                     onOpenAppSettings = { viewModel.showAppInfo() }
                 )
             }
@@ -254,6 +274,7 @@ fun ChatScreen(viewModel: ChatViewModel, isBluetoothEnabled: Boolean = true) {
                 colorScheme = colorScheme,
                 showMediaButtons = showMediaButtons,
                 enabled = !shouldShowBleMeshBanner(isBluetoothEnabled, isBleSettingEnabled, currentChannel, selectedLocationChannel)
+                    && !shouldShowNetworkBanner(networkStatus, isP2PEnabled, isNostrEnabled, currentChannel, selectedLocationChannel)
             )
         }
 
@@ -423,6 +444,130 @@ private fun BleMeshBanner(
             ) {
                 Text(
                     text = stringResource(com.roman.zemzeme.R.string.ble_banner_enable_btn),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = bannerColor
+                )
+            }
+        }
+    }
+}
+
+private fun shouldShowNetworkBanner(
+    networkStatus: NetworkStatus,
+    isP2PEnabled: Boolean,
+    isNostrEnabled: Boolean,
+    currentChannel: String?,
+    selectedLocationChannel: com.roman.zemzeme.geohash.ChannelID?
+): Boolean {
+    // Network banner only applies to internet-requiring views (geohash location or joined channel)
+    val isInternetRequiringView = currentChannel != null ||
+        selectedLocationChannel is com.roman.zemzeme.geohash.ChannelID.Location
+    if (!isInternetRequiringView) return false
+
+    // Both transports disabled by user
+    if (!isP2PEnabled && !isNostrEnabled) return true
+
+    // No network or no validated internet
+    return networkStatus != NetworkStatus.CONNECTED
+}
+
+@Composable
+private fun NetworkBanner(
+    networkStatus: NetworkStatus,
+    isP2PEnabled: Boolean,
+    isNostrEnabled: Boolean,
+    isAirplaneModeOn: Boolean,
+    onOpenAppSettings: () -> Unit
+) {
+    val context = LocalContext.current
+
+    val bannerText: String
+    val bannerIcon: androidx.compose.ui.graphics.vector.ImageVector
+    val onActionClick: () -> Unit
+    val bannerColor: Color
+
+    when {
+        // User has both transports disabled — orange/yellow
+        !isP2PEnabled && !isNostrEnabled -> {
+            bannerColor = Color(0xFFFF9500)
+            bannerText = stringResource(com.roman.zemzeme.R.string.network_banner_transports_disabled)
+            bannerIcon = Icons.Filled.CloudOff
+            onActionClick = onOpenAppSettings
+        }
+        // Airplane mode on — red, open airplane mode settings directly
+        isAirplaneModeOn -> {
+            bannerColor = Color(0xFFFF3B30)
+            bannerText = stringResource(com.roman.zemzeme.R.string.network_banner_airplane_mode)
+            bannerIcon = Icons.Filled.AirplanemodeActive
+            onActionClick = {
+                try {
+                    context.startActivity(Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS))
+                } catch (_: Exception) {
+                    context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
+                }
+            }
+        }
+        // No network at all — red
+        networkStatus == NetworkStatus.DISCONNECTED -> {
+            bannerColor = Color(0xFFFF3B30)
+            bannerText = stringResource(com.roman.zemzeme.R.string.network_banner_disconnected)
+            bannerIcon = Icons.Filled.WifiOff
+            onActionClick = {
+                try {
+                    context.startActivity(Intent(android.provider.Settings.Panel.ACTION_INTERNET_CONNECTIVITY))
+                } catch (_: Exception) {
+                    context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
+                }
+            }
+        }
+        // Connected but no validated internet — red
+        else -> {
+            bannerColor = Color(0xFFFF3B30)
+            bannerText = stringResource(com.roman.zemzeme.R.string.network_banner_no_internet)
+            bannerIcon = Icons.Filled.WifiOff
+            onActionClick = {
+                try {
+                    context.startActivity(Intent(android.provider.Settings.Panel.ACTION_INTERNET_CONNECTIVITY))
+                } catch (_: Exception) {
+                    context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
+                }
+            }
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = bannerColor.copy(alpha = 0.12f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = bannerIcon,
+                contentDescription = null,
+                tint = bannerColor,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = bannerText,
+                style = MaterialTheme.typography.bodySmall,
+                color = bannerColor,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = onActionClick,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = if (!isP2PEnabled && !isNostrEnabled) {
+                        stringResource(com.roman.zemzeme.R.string.network_banner_settings_btn)
+                    } else {
+                        stringResource(com.roman.zemzeme.R.string.ble_banner_enable_btn)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = bannerColor
                 )
