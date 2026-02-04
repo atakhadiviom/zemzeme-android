@@ -148,6 +148,18 @@ class ChatState(
     // Geohash participant counts reactive state (for real-time location channel counts)
     private val _geohashParticipantCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
     val geohashParticipantCounts: StateFlow<Map<String, Int>> = _geohashParticipantCounts.asStateFlow()
+
+    // Custom groups (created/joined group geohashes)
+    private val _customGroups = MutableStateFlow<Set<String>>(emptySet())
+    val customGroups: StateFlow<Set<String>> = _customGroups.asStateFlow()
+
+    // Geographic groups (added via city chooser / map)
+    private val _geographicGroups = MutableStateFlow<Set<String>>(emptySet())
+    val geographicGroups: StateFlow<Set<String>> = _geographicGroups.asStateFlow()
+
+    // Group nicknames (geohash → local nickname)
+    private val _groupNicknames = MutableStateFlow<Map<String, String>>(emptyMap())
+    val groupNicknames: StateFlow<Map<String, String>> = _groupNicknames.asStateFlow()
     
 
     val hasUnreadChannels: StateFlow<Boolean> = _unreadChannelMessages
@@ -195,6 +207,9 @@ class ChatState(
 
     fun getTeleportedGeoValue() = _teleportedGeo.value
     fun getGeohashParticipantCountsValue() = _geohashParticipantCounts.value
+    fun getCustomGroupsValue() = _customGroups.value
+    fun getGeographicGroupsValue() = _geographicGroups.value
+    fun getGroupNicknamesValue() = _groupNicknames.value
     
     // Setters for state updates
     fun setMessages(messages: List<ZemzemeMessage>) {
@@ -386,5 +401,17 @@ class ChatState(
 
     fun setPrivateChatSheetPeer(peerID: String?) {
         _privateChatSheetPeer.value = peerID
+    }
+
+    fun setCustomGroups(groups: Set<String>) {
+        _customGroups.value = groups
+    }
+
+    fun setGeographicGroups(groups: Set<String>) {
+        _geographicGroups.value = groups
+    }
+
+    fun setGroupNicknames(nicknames: Map<String, String>) {
+        _groupNicknames.value = nicknames
     }
 }

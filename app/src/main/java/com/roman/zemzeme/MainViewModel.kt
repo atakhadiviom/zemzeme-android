@@ -3,7 +3,6 @@ package com.roman.zemzeme
 import androidx.lifecycle.ViewModel
 import com.roman.zemzeme.onboarding.BluetoothStatus
 import com.roman.zemzeme.onboarding.LocationStatus
-import com.roman.zemzeme.onboarding.NetworkStatus
 import com.roman.zemzeme.onboarding.OnboardingState
 import com.roman.zemzeme.onboarding.BatteryOptimizationStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,9 +16,6 @@ class MainViewModel : ViewModel() {
 
     private val _bluetoothStatus = MutableStateFlow(BluetoothStatus.ENABLED)
     val bluetoothStatus: StateFlow<BluetoothStatus> = _bluetoothStatus.asStateFlow()
-
-    private val _networkStatus = MutableStateFlow(NetworkStatus.CONNECTED)
-    val networkStatus: StateFlow<NetworkStatus> = _networkStatus.asStateFlow()
 
     private val _locationStatus = MutableStateFlow(LocationStatus.ENABLED)
     val locationStatus: StateFlow<LocationStatus> = _locationStatus.asStateFlow()
@@ -39,6 +35,18 @@ class MainViewModel : ViewModel() {
     private val _isBatteryOptimizationLoading = MutableStateFlow(false)
     val isBatteryOptimizationLoading: StateFlow<Boolean> = _isBatteryOptimizationLoading.asStateFlow()
 
+    // Navigation state: HomeScreen vs ChatScreen
+    private val _isInChat = MutableStateFlow(false)
+    val isInChat: StateFlow<Boolean> = _isInChat.asStateFlow()
+
+    fun enterChat() {
+        _isInChat.value = true
+    }
+
+    fun exitChat() {
+        _isInChat.value = false
+    }
+
     // Public update functions for MainActivity
     fun updateOnboardingState(state: OnboardingState) {
         _onboardingState.value = state
@@ -46,10 +54,6 @@ class MainViewModel : ViewModel() {
 
     fun updateBluetoothStatus(status: BluetoothStatus) {
         _bluetoothStatus.value = status
-    }
-
-    fun updateNetworkStatus(status: NetworkStatus) {
-        _networkStatus.value = status
     }
 
     fun updateLocationStatus(status: LocationStatus) {
