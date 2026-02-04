@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.GroupAdd
 import androidx.compose.material.icons.outlined.Hub
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.outlined.LayersClear
 import androidx.compose.material.icons.outlined.LocationCity
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -72,7 +74,7 @@ private data class ActionTarget(
     val displayName: String
 )
 
-private enum class PendingAction { DELETE, CLEAR }
+private enum class PendingAction { DELETE, CLEAR, RENAME }
 
 // ── HomeScreen ──
 
@@ -117,9 +119,10 @@ fun HomeScreen(
     // FAB
     var fabExpanded by remember { mutableStateOf(false) }
 
-    // Create / Join dialogs
+    // Create / Join / Scan dialogs
     var showCreateDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
+    var showQrScanner by remember { mutableStateOf(false) }
 
     // Long-press action sheet → confirmation flow
     var actionTarget by remember { mutableStateOf<ActionTarget?>(null) }
@@ -250,6 +253,9 @@ fun HomeScreen(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 AnimatedVisibility(fabExpanded, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        FabMenuItem("Scan QR", Icons.Outlined.QrCodeScanner, colorScheme.tertiaryContainer) {
+                            fabExpanded = false; showQrScanner = true
+                        }
                         FabMenuItem("Choose city", Icons.Outlined.LocationCity, colorScheme.tertiaryContainer) {
                             fabExpanded = false
                             geohashPickerLauncher.launch(Intent(context, GeohashPickerActivity::class.java))
@@ -325,7 +331,7 @@ fun HomeScreen(
 
                 items(geoGroupItems, key = { "geo_${it.second}" }) { (_, key, _) ->
                     val nick = groupNicknames[key]
-                    val display = if (nick != null) "$nick ($key)" else key
+                    val display = nick ?: key
                     val groupLastMsg = channelMessages["geo:$key"]?.lastOrNull()
                     GroupRow(
                         name = display,
@@ -346,7 +352,7 @@ fun HomeScreen(
 
                 items(myGroupItems, key = { "group_${it.second}" }) { (_, key, _) ->
                     val nick = groupNicknames[key]
-                    val display = if (nick != null) "$nick ($key)" else key
+                    val display = nick ?: key
                     val groupLastMsg = channelMessages["geo:$key"]?.lastOrNull()
                     GroupRow(
                         name = display,
@@ -394,6 +400,12 @@ fun HomeScreen(
             groupName = target.displayName,
             showDelete = target.type != "mesh" && target.type != "location",
             deleteLabel = if (target.type == "dm") "Delete chat" else "Delete group",
+            showRename = target.type == "group",
+            onRename = {
+                pendingActionTarget = target
+                actionTarget = null
+                pendingAction = PendingAction.RENAME
+            },
             onDelete = {
                 pendingActionTarget = target
                 actionTarget = null
@@ -452,6 +464,19 @@ fun HomeScreen(
         )
     }
 
+    if (pendingAction == PendingAction.RENAME && pendingActionTarget != null) {
+        val target = pendingActionTarget!!
+        RenameGroupDialog(
+            currentName = target.displayName,
+            onConfirm = { newName ->
+                chatViewModel.renameGroup(target.key, newName)
+                pendingAction = null
+                pendingActionTarget = null
+            },
+            onDismiss = { pendingAction = null; pendingActionTarget = null }
+        )
+    }
+
     // ── Create / Join dialogs ──
 
     if (showCreateDialog) {
@@ -464,6 +489,14 @@ fun HomeScreen(
         JoinGroupDialog(
             onDismiss = { showJoinDialog = false },
             onConfirm = { g, n -> chatViewModel.joinGroup(g, n); showJoinDialog = false }
+        )
+    }
+
+    if (showQrScanner) {
+        QrScannerSheet(
+            isPresented = showQrScanner,
+            onDismiss = { showQrScanner = false },
+            viewModel = chatViewModel
         )
     }
 
@@ -623,6 +656,8 @@ private fun GroupActionSheet(
     groupName: String,
     showDelete: Boolean = true,
     deleteLabel: String = "Delete group",
+    showRename: Boolean = false,
+    onRename: () -> Unit = {},
     onDelete: () -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit
@@ -660,6 +695,37 @@ private fun GroupActionSheet(
                 )
 
                 HorizontalDivider(color = extended.borderSubtle)
+
+                // Rename group button
+                if (showRename) {
+                    Surface(
+                        onClick = onRename,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = colorScheme.surfaceVariant
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Edit,
+                                contentDescription = null,
+                                tint = colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                "Rename group",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Medium,
+                                    color = colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    }
+                }
 
                 // Delete group button
                 if (showDelete) {
@@ -818,6 +884,28 @@ private fun JoinGroupDialog(onDismiss: () -> Unit, onConfirm: (String, String) -
                 onClick = { if (geohash.isNotBlank()) onConfirm(geohash.trim(), nickname.trim().ifEmpty { geohash.trim() }) },
                 enabled = geohash.isNotBlank()
             ) { Text("Join") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+private fun RenameGroupDialog(currentName: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var newName by remember { mutableStateOf(currentName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename Group", style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)) },
+        text = {
+            OutlinedTextField(
+                value = newName, onValueChange = { newName = it },
+                label = { Text("Group name") }, singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { if (newName.isNotBlank()) onConfirm(newName.trim()) }, enabled = newName.isNotBlank()) {
+                Text("Rename")
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )

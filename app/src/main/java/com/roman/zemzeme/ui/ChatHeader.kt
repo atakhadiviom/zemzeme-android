@@ -490,7 +490,7 @@ private fun LocationChannelsButton(
 
     val (badgeText, badgeColor) = when (selectedChannel) {
         is com.roman.zemzeme.geohash.ChannelID.Mesh -> {
-            "#mesh" to Color.White
+            "mesh" to Color.White
         }
         is com.roman.zemzeme.geohash.ChannelID.Location -> {
             val geohash = (selectedChannel as com.roman.zemzeme.geohash.ChannelID.Location).channel.geohash
@@ -499,9 +499,9 @@ private fun LocationChannelsButton(
             val displayName = groupNicknames[geohash]
                 ?: locationNames[level]
                 ?: geohash
-            "#$displayName" to Color.White
+            displayName to Color.White
         }
-        null -> "#mesh" to Color.White
+        null -> "mesh" to Color.White
     }
 
     // Get P2P connection state for current geohash channel
@@ -589,12 +589,15 @@ private fun LocationChannelsButton(
             }
         }
 
-        // Nickname subtitle
-        Text(
-            text = "@$nickname",
-            fontSize = 12.sp,
-            color = Color.White.copy(alpha = 0.5f),
-            maxLines = 1
-        )
+        // Subtitle: Group ID for groups, empty for mesh
+        if (selectedChannel is com.roman.zemzeme.geohash.ChannelID.Location) {
+            val geohash = (selectedChannel as com.roman.zemzeme.geohash.ChannelID.Location).channel.geohash
+            Text(
+                text = "Group ID: $geohash",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                maxLines = 1
+            )
+        }
     }
 }

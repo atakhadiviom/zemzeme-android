@@ -1359,6 +1359,11 @@ class ChatViewModel(
         state.setGroupNicknames(dataManager.loadAllGroupNicknames())
     }
 
+    fun renameGroup(geohash: String, newNickname: String) {
+        dataManager.saveGroupNickname(geohash, newNickname)
+        state.setGroupNicknames(dataManager.loadAllGroupNicknames())
+    }
+
     fun removeGroup(geohash: String) {
         dataManager.removeCustomGroup(geohash)
         state.setCustomGroups(dataManager.loadCustomGroups())
