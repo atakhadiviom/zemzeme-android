@@ -32,6 +32,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roman.zemzeme.geohash.isMeshView
+import com.roman.zemzeme.BuildConfig
 import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.onboarding.NetworkStatus
 import com.roman.zemzeme.onboarding.NetworkStatusManager
@@ -48,7 +49,7 @@ import com.roman.zemzeme.ui.media.FullScreenImageViewer
  * - ChatUIUtils: Utility functions for formatting and colors
  */
 @Composable
-fun ChatScreen(viewModel: ChatViewModel, isBluetoothEnabled: Boolean = true) {
+fun ChatScreen(viewModel: ChatViewModel, isBluetoothEnabled: Boolean = true, onBackToHome: () -> Unit = {}) {
     val colorScheme = MaterialTheme.colorScheme
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val connectedPeers by viewModel.connectedPeers.collectAsStateWithLifecycle()
@@ -129,7 +130,7 @@ fun ChatScreen(viewModel: ChatViewModel, isBluetoothEnabled: Boolean = true) {
             .fillMaxSize()
             .background(colorScheme.background) // Extend background to fill entire screen including status bar
     ) {
-        val headerHeight = 42.dp
+        val headerHeight = 64.dp
 
         // Main content area that responds to keyboard/window insets
         Column(
@@ -287,6 +288,7 @@ fun ChatScreen(viewModel: ChatViewModel, isBluetoothEnabled: Boolean = true) {
             viewModel = viewModel,
             colorScheme = colorScheme,
             onSidebarToggle = { viewModel.showMeshPeerList() },
+            onBackToHome = onBackToHome,
             onShowAppInfo = { viewModel.showAppInfo() },
             onPanicClear = { viewModel.panicClearAllData() },
             onLocationChannelsClick = { showLocationChannelsSheet = true },
@@ -648,6 +650,7 @@ private fun ChatFloatingHeader(
     viewModel: ChatViewModel,
     colorScheme: ColorScheme,
     onSidebarToggle: () -> Unit,
+    onBackToHome: () -> Unit,
     onShowAppInfo: () -> Unit,
     onPanicClear: () -> Unit,
     onLocationChannelsClick: () -> Unit,
@@ -663,35 +666,36 @@ private fun ChatFloatingHeader(
             .windowInsetsPadding(WindowInsets.statusBars), // Extend into status bar area
         color = colorScheme.background // Solid background color extending into status bar
     ) {
-        TopAppBar(
-            title = {
-                ChatHeaderContent(
-                    selectedPrivatePeer = selectedPrivatePeer,
-                    currentChannel = currentChannel,
-                    nickname = nickname,
-                    viewModel = viewModel,
-                    onBackClick = {
-                        when {
-                            selectedPrivatePeer != null -> viewModel.endPrivateChat()
-                            currentChannel != null -> viewModel.switchToChannel(null)
-                        }
-                    },
-                    onSidebarClick = onSidebarToggle,
-                    onTripleClick = onPanicClear,
-                    onShowAppInfo = onShowAppInfo,
-                    onLocationChannelsClick = onLocationChannelsClick,
-                    onLocationNotesClick = {
-                        // Ensure location is loaded before showing sheet
-                        locationManager.refreshChannels()
-                        onLocationNotesClick()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(headerHeight)
+                .padding(horizontal = 4.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            ChatHeaderContent(
+                selectedPrivatePeer = selectedPrivatePeer,
+                currentChannel = currentChannel,
+                nickname = nickname,
+                viewModel = viewModel,
+                onBackClick = {
+                    when {
+                        selectedPrivatePeer != null -> viewModel.endPrivateChat()
+                        currentChannel != null -> viewModel.switchToChannel(null)
                     }
-                )
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent
-            ),
-            modifier = Modifier.height(headerHeight) // Ensure compact header height
-        )
+                },
+                onBackToHome = onBackToHome,
+                onSidebarClick = onSidebarToggle,
+                onTripleClick = onPanicClear,
+                onShowAppInfo = onShowAppInfo,
+                onLocationChannelsClick = onLocationChannelsClick,
+                onLocationNotesClick = {
+                    // Ensure location is loaded before showing sheet
+                    locationManager.refreshChannels()
+                    onLocationNotesClick()
+                }
+            )
+        }
     }
 }
 
@@ -741,9 +745,9 @@ private fun ChatDialogs(
         isPresented = showAppInfo,
         onDismiss = onAppInfoDismiss,
         isBluetoothEnabled = isBluetoothEnabled,
-        onShowDebug = { showDebugSheet = true }
+        onShowDebug = if (BuildConfig.DEBUG) ({ showDebugSheet = true }) else null
     )
-    if (showDebugSheet) {
+    if (BuildConfig.DEBUG && showDebugSheet) {
         com.roman.zemzeme.ui.debug.DebugSettingsSheet(
             isPresented = showDebugSheet,
             onDismiss = { showDebugSheet = false },

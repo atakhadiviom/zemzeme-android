@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roman.zemzeme.core.ui.utils.singleOrTripleClickable
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -124,27 +125,28 @@ fun NicknameEditor(
     ) {
         Text(
             text = stringResource(R.string.at_symbol),
-            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 20.sp,
             color = colorScheme.primary.copy(alpha = 0.8f)
         )
-        
+
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            textStyle = MaterialTheme.typography.bodyMedium.copy(
+            textStyle = MaterialTheme.typography.titleLarge.copy(
                 color = colorScheme.primary,
-                fontFamily = FontFamily.Monospace
+                fontFamily = FontFamily.Monospace,
+                fontSize = 20.sp
             ),
             cursorBrush = SolidColor(colorScheme.primary),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(
-                onDone = { 
+                onDone = {
                     focusManager.clearFocus()
                 }
             ),
             modifier = Modifier
-                .widthIn(max = 120.dp)
+                .widthIn(max = 160.dp)
                 .horizontalScroll(scrollState)
         )
     }
@@ -234,25 +236,23 @@ fun PeerCounter(
                 is com.roman.zemzeme.geohash.ChannelID.Location -> stringResource(R.string.cd_geohash_participants)
                 else -> stringResource(R.string.cd_connected_peers)
             },
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(24.dp),
             tint = countColor
         )
         Spacer(modifier = Modifier.width(4.dp))
 
         Text(
             text = displayText,
-            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 20.sp,
             color = countColor,
-            fontSize = 16.sp,
             fontWeight = FontWeight.Medium
         )
-        
+
         if (joinedChannels.isNotEmpty()) {
             Text(
                 text = stringResource(R.string.channel_count_prefix) + "${joinedChannels.size}",
-                style = MaterialTheme.typography.bodyMedium,
+                fontSize = 20.sp,
                 color = if (isConnected) Color(0xFF00F5FF) else Color.Red,
-                fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -266,6 +266,7 @@ fun ChatHeaderContent(
     nickname: String,
     viewModel: ChatViewModel,
     onBackClick: () -> Unit,
+    onBackToHome: () -> Unit,
     onSidebarClick: () -> Unit,
     onTripleClick: () -> Unit,
     onShowAppInfo: () -> Unit,
@@ -287,13 +288,8 @@ fun ChatHeaderContent(
         else -> {
             // Main header
             MainHeader(
-                nickname = nickname,
-                onNicknameChange = viewModel::setNickname,
-                onTitleClick = onShowAppInfo,
-                onTripleTitleClick = onTripleClick,
+                onBackToHome = onBackToHome,
                 onSidebarClick = onSidebarClick,
-                onLocationChannelsClick = onLocationChannelsClick,
-                onLocationNotesClick = onLocationNotesClick,
                 viewModel = viewModel
             )
         }
@@ -311,55 +307,44 @@ private fun ChannelHeader(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // Back button - positioned all the way to the left with minimal margin
-        Button(
-            onClick = onBackClick,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                contentColor = colorScheme.primary
-            ),
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp), // Reduced horizontal padding
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = (-8).dp) // Move even further left to minimize margin
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left: back arrow + channel name
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.back),
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = colorScheme.primary
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = stringResource(R.string.chat_back),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colorScheme.primary
-                )
             }
+
+            Text(
+                text = stringResource(R.string.chat_channel_prefix, channel),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Default,
+                letterSpacing = 0.sp,
+                color = Color.White,
+                modifier = Modifier.clickable { onSidebarClick() }
+            )
         }
-        
-        // Title - perfectly centered regardless of other elements
-        Text(
-            text = stringResource(R.string.chat_channel_prefix, channel),
-            style = MaterialTheme.typography.titleMedium,
-            color = Color(0xFFFF9500), // Orange to match input field
-            modifier = Modifier
-                .align(Alignment.Center)
-                .clickable { onSidebarClick() }
-        )
-        
-        // Leave button - positioned on the right
-        TextButton(
-            onClick = onLeaveChannel,
-            modifier = Modifier.align(Alignment.CenterEnd)
-        ) {
+
+        // Right: leave button
+        TextButton(onClick = onLeaveChannel) {
             Text(
                 text = stringResource(R.string.chat_leave),
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 16.sp,
                 color = Color.Red
             )
         }
@@ -368,13 +353,8 @@ private fun ChannelHeader(
 
 @Composable
 private fun MainHeader(
-    nickname: String,
-    onNicknameChange: (String) -> Unit,
-    onTitleClick: () -> Unit,
-    onTripleTitleClick: () -> Unit,
+    onBackToHome: () -> Unit,
     onSidebarClick: () -> Unit,
-    onLocationChannelsClick: () -> Unit,
-    onLocationNotesClick: () -> Unit,
     viewModel: ChatViewModel
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -386,107 +366,81 @@ private fun MainHeader(
     val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsStateWithLifecycle()
     val geohashPeople by viewModel.geohashPeople.collectAsStateWithLifecycle()
 
-    // Bookmarks store for current geohash toggle (iOS parity)
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val bookmarksStore = remember { com.roman.zemzeme.geohash.GeohashBookmarksStore.getInstance(context) }
-    val bookmarks by bookmarksStore.bookmarks.collectAsStateWithLifecycle()
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxHeight(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(R.string.app_brand),
-                style = MaterialTheme.typography.headlineSmall,
-                color = colorScheme.primary,
-                modifier = Modifier.singleOrTripleClickable(
-                    onSingleClick = onTitleClick,
-                    onTripleClick = onTripleTitleClick
+        // Left: back button + channel name
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = onBackToHome,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.back),
+                    modifier = Modifier.size(24.dp),
+                    tint = colorScheme.primary
                 )
-            )
-            
-            Spacer(modifier = Modifier.width(2.dp))
-            
-            NicknameEditor(
-                value = nickname,
-                onValueChange = onNicknameChange
+            }
+
+            LocationChannelsButton(
+                viewModel = viewModel
             )
         }
-        
-        // Right section with location channels button and peer counter
+
+        // Right: status indicators and actions
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-            // Unread private messages badge (click to open most recent DM)
+            // Unread private messages badge
             if (hasUnreadPrivateMessages.isNotEmpty()) {
-                // Render icon directly to avoid symbol resolution issues
                 Icon(
                     imageVector = Icons.Filled.Email,
                     contentDescription = stringResource(R.string.cd_unread_private_messages),
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(24.dp)
                         .clickable { viewModel.openLatestUnreadPrivateChat() },
                     tint = Color(0xFFFF9500)
                 )
             }
 
-            // Location channels button (matching iOS implementation) and bookmark grouped tightly
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
-                LocationChannelsButton(
-                    viewModel = viewModel,
-                    onClick = onLocationChannelsClick
+            // Status dots: Tor + PoW
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TorStatusDot(modifier = Modifier.size(12.dp))
+                PoWStatusIndicator(
+                    modifier = Modifier,
+                    style = PoWIndicatorStyle.COMPACT
                 )
+            }
 
-                // Bookmark toggle for current geohash (not shown for mesh)
-                val currentGeohash: String? = when (val sc = selectedLocationChannel) {
-                    is com.roman.zemzeme.geohash.ChannelID.Location -> sc.channel.geohash
-                    else -> null
-                }
-                if (currentGeohash != null) {
-                    val isBookmarked = bookmarks.contains(currentGeohash)
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 2.dp) // minimal gap between geohash and bookmark
-                            .size(20.dp)
-                            .clickable { bookmarksStore.toggle(currentGeohash) },
-                        contentAlignment = Alignment.Center
+            // Unread channel badge
+            val totalUnread = hasUnreadChannels.values.sum()
+            if (totalUnread > 0) {
+                Box(contentAlignment = Alignment.Center) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Red,
+                        modifier = Modifier.size(22.dp)
                     ) {
-                        Icon(
-                            imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                            contentDescription = stringResource(R.string.cd_toggle_bookmark),
-                            tint = if (isBookmarked) Color(0xFF00F5FF) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = if (totalUnread > 99) "99+" else "$totalUnread",
+                                fontSize = 11.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
 
-            // Location Notes button (extracted to separate component)
-            LocationNotesButton(
-                viewModel = viewModel,
-                onClick = onLocationNotesClick
-            )
-
-            // Tor status dot when Tor is enabled
-            TorStatusDot(
-                modifier = Modifier
-                    .size(8.dp)
-                    .padding(start = 0.dp, end = 2.dp)
-            )
-            
-            // PoW status indicator
-            PoWStatusIndicator(
-                modifier = Modifier,
-                style = PoWIndicatorStyle.COMPACT
-            )
-            Spacer(modifier = Modifier.width(2.dp))
+            // Peer counter
             PeerCounter(
                 connectedPeers = connectedPeers.filter { it != viewModel.meshService.myPeerID },
                 joinedChannels = joinedChannels,
@@ -496,27 +450,13 @@ private fun MainHeader(
                 geohashPeople = geohashPeople,
                 onClick = onSidebarClick
             )
-
-            // Settings icon button
-            IconButton(
-                onClick = onTitleClick,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(R.string.cd_settings),
-                    tint = colorScheme.onSurface.copy(alpha = 0.7f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         }
     }
 }
 
 @Composable
 private fun LocationChannelsButton(
-    viewModel: ChatViewModel,
-    onClick: () -> Unit
+    viewModel: ChatViewModel
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -540,15 +480,28 @@ private fun LocationChannelsButton(
     // Get P2P topic states for geohash channels
     val p2pTopicStates by viewModel.p2pTopicStates.collectAsStateWithLifecycle()
 
+    // Get group nicknames and location names for display
+    val groupNicknames by viewModel.groupNicknames.collectAsStateWithLifecycle()
+    val locationChannelManager = remember {
+        try { com.roman.zemzeme.geohash.LocationChannelManager.getInstance(context) } catch (_: Exception) { null }
+    }
+    val locationNames by locationChannelManager?.locationNames?.collectAsStateWithLifecycle()
+        ?: remember { mutableStateOf(emptyMap()) }
+
     val (badgeText, badgeColor) = when (selectedChannel) {
         is com.roman.zemzeme.geohash.ChannelID.Mesh -> {
-            "#mesh" to Color(0xFF007AFF) // iOS blue for mesh
+            "#mesh" to Color.White
         }
         is com.roman.zemzeme.geohash.ChannelID.Location -> {
             val geohash = (selectedChannel as com.roman.zemzeme.geohash.ChannelID.Location).channel.geohash
-            "#$geohash" to Color(0xFF00F5FF) // Green for location
+            val level = (selectedChannel as com.roman.zemzeme.geohash.ChannelID.Location).channel.level
+            // Try group nickname first, then location name, then fallback to geohash
+            val displayName = groupNicknames[geohash]
+                ?: locationNames[level]
+                ?: geohash
+            "#$displayName" to Color.White
         }
-        null -> "#mesh" to Color(0xFF007AFF) // Default to mesh
+        null -> "#mesh" to Color.White
     }
 
     // Get P2P connection state for current geohash channel
@@ -582,30 +535,31 @@ private fun LocationChannelsButton(
     val transportConnectionState = p2pConnectionState ?: nostrConnectionState
     val needsRefresh = p2pConnectionState == com.roman.zemzeme.p2p.TopicConnectionState.ERROR
 
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.Transparent,
-            contentColor = badgeColor
-        ),
-        contentPadding = PaddingValues(start = 4.dp, end = 0.dp, top = 2.dp, bottom = 2.dp)
+    val isConnected by viewModel.isConnected.collectAsStateWithLifecycle()
+    val nickname by viewModel.nickname.collectAsStateWithLifecycle()
+
+    Column(
+        modifier = Modifier
+            .padding(start = 16.dp, end = 8.dp, top = 2.dp, bottom = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = badgeText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontFamily = FontFamily.Monospace
-                ),
+                fontSize = 22.sp,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold,
                 color = badgeColor,
                 maxLines = 1
             )
 
-            // Active transport connection status indicator (for geohash channels only).
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Connection status dot
             if (transportConnectionState != null) {
-                Spacer(modifier = Modifier.width(4.dp))
+                // Geohash channel: use P2P/Nostr transport state
                 P2PConnectionDot(
                     connectionState = transportConnectionState,
-                    modifier = Modifier.size(6.dp)
+                    modifier = Modifier.size(10.dp)
                 )
 
                 // P2P refresh button (visible only on error)
@@ -615,7 +569,7 @@ private fun LocationChannelsButton(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh P2P connection",
                         modifier = Modifier
-                            .size(14.dp)
+                            .size(22.dp)
                             .clickable {
                                 Log.d("ChatHeader", "P2P refresh button clicked")
                                 viewModel.refreshP2PConnection()
@@ -623,18 +577,24 @@ private fun LocationChannelsButton(
                         tint = Color(0xFFFF9500) // Orange to indicate action needed
                     )
                 }
-            }
-
-            // Teleportation indicator (like iOS)
-            if (teleported) {
-                Spacer(modifier = Modifier.width(2.dp))
-                Icon(
-                    imageVector = Icons.Default.PinDrop,
-                    contentDescription = stringResource(R.string.cd_teleported),
-                    modifier = Modifier.size(12.dp),
-                    tint = badgeColor
-                )
+            } else {
+                // Mesh channel: green when connected, red when disconnected
+                Canvas(modifier = Modifier.size(10.dp)) {
+                    drawCircle(
+                        color = if (isConnected) Color(0xFF4CAF50) else Color.Red,
+                        radius = size.minDimension / 2,
+                        center = Offset(size.width / 2, size.height / 2)
+                    )
+                }
             }
         }
+
+        // Nickname subtitle
+        Text(
+            text = "@$nickname",
+            fontSize = 12.sp,
+            color = Color.White.copy(alpha = 0.5f),
+            maxLines = 1
+        )
     }
 }

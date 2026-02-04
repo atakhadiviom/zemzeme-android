@@ -88,6 +88,10 @@
   <string name="cd_encrypted">End-to-end encrypted</string>
   <string name="cd_handshake_failed">Handshake failed</string>
   <string name="cd_settings">Settings</string>
+  <string name="cd_refresh_account">Refresh account</string>
+  <string name="refresh_account_title">Refresh Account?</string>
+  <string name="refresh_account_message">This will delete all messages and generate a new identity. This cannot be undone.</string>
+  <string name="refresh_account_confirm">Refresh</string>
 
   <!-- File viewer dialog -->
   <string name="file_viewer_title">📎 File Received</string>

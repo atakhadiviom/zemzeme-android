@@ -1122,7 +1122,10 @@ class ChatViewModel(
         channelManager.clearAllChannels()
         privateChatManager.clearAllPrivateChats()
         dataManager.clearAllData()
-        
+
+        // Clear process-wide in-memory message store
+        com.roman.zemzeme.services.AppStateStore.clear()
+
         // Clear seen message store
         try {
             com.roman.zemzeme.services.SeenMessageStore.getInstance(getApplication()).clear()

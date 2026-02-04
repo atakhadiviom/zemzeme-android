@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.GroupAdd
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.LayersClear
 import androidx.compose.material.icons.outlined.LocationCity
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -48,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,6 +58,8 @@ import com.roman.zemzeme.geohash.ChannelID
 import com.roman.zemzeme.geohash.GeohashChannelLevel
 import com.roman.zemzeme.geohash.LocationChannelManager
 import com.roman.zemzeme.model.ZemzemeMessage
+import androidx.compose.ui.res.stringResource
+import com.roman.zemzeme.R
 import com.roman.zemzeme.ui.theme.extendedColors
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -71,12 +76,12 @@ private enum class PendingAction { DELETE, CLEAR }
 
 // ── HomeScreen ──
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     chatViewModel: ChatViewModel,
     onGroupSelected: () -> Unit,
     onSettingsClick: () -> Unit,
+    onRefreshAccount: () -> Unit,
     onCityChosen: (String) -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -121,6 +126,9 @@ fun HomeScreen(
     var pendingAction by remember { mutableStateOf<PendingAction?>(null) }
     var pendingActionTarget by remember { mutableStateOf<ActionTarget?>(null) }
 
+    // Refresh account confirmation dialog
+    var showRefreshDialog by remember { mutableStateOf(false) }
+
     // GeohashPicker launcher
     val geohashPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -145,50 +153,98 @@ fun HomeScreen(
         }.sortedByDescending { it.third }
     }
 
-    // "My Groups" = custom groups + DMs, sorted by last-message time
-    val myGroupItems = remember(customGroups, privateChats, channelMessages) {
-        val items = mutableListOf<Triple<String, String, Long>>()
-        customGroups.forEach { geohash ->
+    // "My Groups" = custom groups only, sorted by last-message time
+    val myGroupItems = remember(customGroups, channelMessages) {
+        customGroups.map { geohash ->
             val lastTs = channelMessages["geo:$geohash"]?.lastOrNull()?.timestamp?.time ?: 0L
-            items.add(Triple("group", geohash, lastTs))
-        }
-        privateChats.forEach { (pid, msgs) ->
-            items.add(Triple("dm", pid, msgs.lastOrNull()?.timestamp?.time ?: 0L))
-        }
-        items.sortedByDescending { it.third }
+            Triple("group", geohash, lastTs)
+        }.sortedByDescending { it.third }
+    }
+
+    // "Contacts" = DMs, sorted by last-message time
+    val contactItems = remember(privateChats) {
+        privateChats.map { (pid, msgs) ->
+            Triple("dm", pid, msgs.lastOrNull()?.timestamp?.time ?: 0L)
+        }.sortedByDescending { it.third }
     }
 
     // ── Scaffold ──
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Zemzeme",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                },
-                actions = {
-                    Text(
-                        nickname.ifEmpty { myPeerID.take(8) },
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace,
-                            color = extended.textSecondary
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 120.dp)
-                    )
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Settings")
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colorScheme.background)
+                    .windowInsetsPadding(WindowInsets.statusBars)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .padding(horizontal = 4.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left: title + nickname subtitle (matching LocationChannelsButton layout)
+                        Column(
+                            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 2.dp, bottom = 2.dp)
+                        ) {
+                            Text(
+                                "Zemzeme",
+                                fontSize = 22.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                "@${nickname.ifEmpty { myPeerID.take(8) }}",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.5f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        // Right: refresh + settings
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            IconButton(
+                                onClick = { showRefreshDialog = true },
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Refresh,
+                                    contentDescription = stringResource(R.string.cd_refresh_account),
+                                    tint = colorScheme.onSurface.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = onSettingsClick,
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Settings,
+                                    contentDescription = stringResource(R.string.cd_settings),
+                                    tint = colorScheme.onSurface.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
-            )
+                }
+                HorizontalDivider(
+                    color = colorScheme.outline.copy(alpha = 0.3f)
+                )
+            }
         },
         floatingActionButton = {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -275,6 +331,7 @@ fun HomeScreen(
                         name = display,
                         lastMessage = groupLastMsg,
                         avatarColor = extended.solarOrange,
+                        icon = Icons.Outlined.Map,
                         myPeerID = myPeerID,
                         myNickname = nickname,
                         onClick = { chatViewModel.navigateToGeohashGroup(key); onGroupSelected() },
@@ -287,42 +344,44 @@ fun HomeScreen(
             if (myGroupItems.isNotEmpty()) {
                 item(key = "mygroups_header") { SectionHeader("My Groups") }
 
-                items(myGroupItems, key = { "${it.first}_${it.second}" }) { (type, key, _) ->
-                    when (type) {
-                        "group" -> {
-                            val nick = groupNicknames[key]
-                            val display = if (nick != null) "$nick ($key)" else key
-                            val groupLastMsg = channelMessages["geo:$key"]?.lastOrNull()
-                            GroupRow(
-                                name = display,
-                                lastMessage = groupLastMsg,
-                                avatarColor = extended.neonPurple,
-                                myPeerID = myPeerID,
-                                myNickname = nickname,
-                                onClick = { chatViewModel.navigateToGeohashGroup(key); onGroupSelected() },
-                                onLongPress = { actionTarget = ActionTarget("group", key, display) }
-                            )
-                        }
-                        "dm" -> {
-                            val lastMsg = (privateChats[key] ?: emptyList()).lastOrNull()
-                            val peerName = peerNicknames[key]
-                                ?: com.roman.zemzeme.p2p.P2PAliasRegistry.getDisplayName(key)
-                                ?: key.take(12) + "..."
-                            GroupRow(
-                                name = peerName,
-                                lastMessage = lastMsg,
-                                avatarColor = extended.neonPurple,
-                                myPeerID = myPeerID,
-                                myNickname = nickname,
-                                onClick = {
-                                    chatViewModel.navigateToMesh()
-                                    chatViewModel.navigateToPrivateChat(key)
-                                    onGroupSelected()
-                                },
-                                onLongPress = { actionTarget = ActionTarget("dm", key, peerName) }
-                            )
-                        }
-                    }
+                items(myGroupItems, key = { "group_${it.second}" }) { (_, key, _) ->
+                    val nick = groupNicknames[key]
+                    val display = if (nick != null) "$nick ($key)" else key
+                    val groupLastMsg = channelMessages["geo:$key"]?.lastOrNull()
+                    GroupRow(
+                        name = display,
+                        lastMessage = groupLastMsg,
+                        avatarColor = extended.neonPurple,
+                        myPeerID = myPeerID,
+                        myNickname = nickname,
+                        onClick = { chatViewModel.navigateToGeohashGroup(key); onGroupSelected() },
+                        onLongPress = { actionTarget = ActionTarget("group", key, display) }
+                    )
+                }
+            }
+
+            // ── CONTACTS ──
+            if (contactItems.isNotEmpty()) {
+                item(key = "contacts_header") { SectionHeader("Contacts") }
+
+                items(contactItems, key = { "dm_${it.second}" }) { (_, key, _) ->
+                    val lastMsg = (privateChats[key] ?: emptyList()).lastOrNull()
+                    val peerName = peerNicknames[key]
+                        ?: com.roman.zemzeme.p2p.P2PAliasRegistry.getDisplayName(key)
+                        ?: key.take(12) + "..."
+                    GroupRow(
+                        name = peerName,
+                        lastMessage = lastMsg,
+                        avatarColor = Color(0xFF32D74B),
+                        myPeerID = myPeerID,
+                        myNickname = nickname,
+                        onClick = {
+                            chatViewModel.navigateToMesh()
+                            chatViewModel.navigateToPrivateChat(key)
+                            onGroupSelected()
+                        },
+                        onLongPress = { actionTarget = ActionTarget("dm", key, peerName) }
+                    )
                 }
             }
         }
@@ -405,6 +464,27 @@ fun HomeScreen(
         JoinGroupDialog(
             onDismiss = { showJoinDialog = false },
             onConfirm = { g, n -> chatViewModel.joinGroup(g, n); showJoinDialog = false }
+        )
+    }
+
+    if (showRefreshDialog) {
+        AlertDialog(
+            onDismissRequest = { showRefreshDialog = false },
+            title = { Text(stringResource(R.string.refresh_account_title)) },
+            text = { Text(stringResource(R.string.refresh_account_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRefreshDialog = false
+                    onRefreshAccount()
+                }) {
+                    Text(stringResource(R.string.refresh_account_confirm), color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRefreshDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
         )
     }
 }

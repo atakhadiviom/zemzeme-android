@@ -54,12 +54,12 @@ fun LocationNotesButton(
         val hasNotes = notesCount > 0
         IconButton(
             onClick = onClick,
-            modifier = modifier.size(24.dp)
+            modifier = modifier.size(40.dp)
         ) {
             Icon(
                 imageVector = Icons.Outlined.Description, // "long.text.page.and.pencil" equivalent
                 contentDescription = stringResource(R.string.cd_location_notes),
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(24.dp),
                 tint = if (hasNotes) colorScheme.primary else Color.Gray
             )
         }

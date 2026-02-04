@@ -60,7 +60,7 @@ fun PoWStatusIndicator(
                         contentDescription = stringResource(R.string.cd_mining_pow),
                         tint = Color(0xFFFF9500), // Orange for mining
                         modifier = Modifier
-                            .size(12.dp)
+                            .size(20.dp)
                             .graphicsLayer { rotationZ = rotation }
                     )
                 } else {
@@ -68,7 +68,7 @@ fun PoWStatusIndicator(
                         imageVector = Icons.Filled.Security,
                         contentDescription = stringResource(R.string.cd_pow_enabled),
                         tint = if (isDark) Color(0xFF00F5FF) else Color(0xFF248A3D), // Green when ready
-                        modifier = Modifier.size(12.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

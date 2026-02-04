@@ -32,6 +32,8 @@ import com.roman.zemzeme.onboarding.InitializingScreen
 import com.roman.zemzeme.onboarding.LocationCheckScreen
 import com.roman.zemzeme.onboarding.LocationStatus
 import com.roman.zemzeme.onboarding.LocationStatusManager
+import com.roman.zemzeme.onboarding.NetworkStatus
+import com.roman.zemzeme.onboarding.NetworkStatusManager
 import com.roman.zemzeme.onboarding.OnboardingCoordinator
 import com.roman.zemzeme.onboarding.OnboardingState
 import com.roman.zemzeme.onboarding.PermissionExplanationScreen
@@ -52,6 +54,7 @@ class MainActivity : OrientationAwareActivity() {
     private lateinit var permissionManager: PermissionManager
     private lateinit var onboardingCoordinator: OnboardingCoordinator
     private lateinit var bluetoothStatusManager: BluetoothStatusManager
+    private lateinit var networkStatusManager: NetworkStatusManager
     private lateinit var locationStatusManager: LocationStatusManager
     private lateinit var batteryOptimizationManager: BatteryOptimizationManager
     
@@ -122,6 +125,7 @@ class MainActivity : OrientationAwareActivity() {
             onBluetoothEnabled = ::handleBluetoothEnabled,
             onBluetoothDisabled = ::handleBluetoothDisabled
         )
+        networkStatusManager = NetworkStatusManager(this)
         locationStatusManager = LocationStatusManager(
             activity = this,
             context = this,
@@ -186,7 +190,7 @@ class MainActivity : OrientationAwareActivity() {
         val isLocationLoading by mainViewModel.isLocationLoading.collectAsState()
         val isBatteryOptimizationLoading by mainViewModel.isBatteryOptimizationLoading.collectAsState()
 
-        DisposableEffect(context, bluetoothStatusManager) {
+        DisposableEffect(context, bluetoothStatusManager, networkStatusManager) {
 
             val receiver = bluetoothStatusManager.monitorBluetoothState(
                 context = context,
@@ -198,6 +202,9 @@ class MainActivity : OrientationAwareActivity() {
                 }
             )
 
+            // Start network connectivity monitoring (updates NetworkStatusManager.networkStatusFlow directly)
+            networkStatusManager.startMonitoring()
+
             onDispose {
                 try {
                     context.unregisterReceiver(receiver)
@@ -205,6 +212,7 @@ class MainActivity : OrientationAwareActivity() {
                 } catch (e: IllegalStateException) {
                     Log.w("BluetoothStatusUI", "Receiver was not registered")
                 }
+                networkStatusManager.stopMonitoring()
             }
         }
 
@@ -306,12 +314,17 @@ class MainActivity : OrientationAwareActivity() {
                             mainViewModel.exitChat()
                         }
                     }
-                    ChatScreen(viewModel = chatViewModel)
+                    ChatScreen(
+                        viewModel = chatViewModel,
+                        isBluetoothEnabled = bluetoothStatus == BluetoothStatus.ENABLED,
+                        onBackToHome = { mainViewModel.exitChat() }
+                    )
                 } else {
                     HomeScreen(
                         chatViewModel = chatViewModel,
                         onGroupSelected = { mainViewModel.enterChat() },
                         onSettingsClick = { chatViewModel.showAppInfo() },
+                        onRefreshAccount = { chatViewModel.panicClearAllData() },
                         onCityChosen = { geohash ->
                             // Reverse geocode the chosen geohash to get city name
                             lifecycleScope.launch {
@@ -537,7 +550,12 @@ class MainActivity : OrientationAwareActivity() {
         Log.w("MainActivity", "Bluetooth disabled or failed: $message")
         mainViewModel.updateBluetoothLoading(false)
         mainViewModel.updateBluetoothStatus(bluetoothStatusManager.checkBluetoothStatus())
-        
+
+        // If the app is fully running, stay on ChatScreen — the inline banner will appear
+        if (mainViewModel.onboardingState.value == OnboardingState.COMPLETE) {
+            return
+        }
+
         when {
             mainViewModel.bluetoothStatus.value == BluetoothStatus.NOT_SUPPORTED -> {
                 // Show permanent error for unsupported devices
@@ -768,12 +786,15 @@ class MainActivity : OrientationAwareActivity() {
                 if (currentBluetoothStatus != BluetoothStatus.ENABLED) {
                     Log.w("MainActivity", "Bluetooth disabled while app was backgrounded")
                     mainViewModel.updateBluetoothStatus(currentBluetoothStatus)
-                    mainViewModel.updateOnboardingState(OnboardingState.BLUETOOTH_CHECK)
                     mainViewModel.updateBluetoothLoading(false)
+                    // Stay on ChatScreen — the inline BLE banner will inform the user
                     return
                 }
             }
             
+            // Refresh network + airplane-mode state on resume
+            networkStatusManager.refreshStatus()
+
             // Check if location services were disabled while app was backgrounded
             val currentLocationStatus = locationStatusManager.checkLocationStatus()
             if (currentLocationStatus != LocationStatus.ENABLED) {
