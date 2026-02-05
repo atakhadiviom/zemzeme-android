@@ -90,6 +90,119 @@ import java.util.concurrent.Executors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun QrScannerSheet(
+    isPresented: Boolean,
+    onDismiss: () -> Unit,
+    viewModel: ChatViewModel,
+    modifier: Modifier = Modifier
+) {
+    if (!isPresented) return
+
+    val isDark = isSystemInDarkTheme()
+    val accent = if (isDark) Color.Green else Color(0xFF008000)
+
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Scan, 1 = My QR
+    val nickname by viewModel.nickname.collectAsStateWithLifecycle()
+    val npub = remember { viewModel.getCurrentNpub() }
+
+    val qrString = remember(nickname, npub) {
+        viewModel.buildMyQRString(nickname, npub)
+    }
+
+    ZemzemeBottomSheet(
+        modifier = modifier,
+        onDismissRequest = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.Top
+        ) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.verify_title).uppercase(),
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = accent
+                )
+                CloseButton(onClick = onDismiss)
+            }
+
+            // Tabs
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Color.Transparent,
+                contentColor = accent,
+                indicator = { tabPositions ->
+                    TabRowDefaults.Indicator(
+                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = accent
+                    )
+                }
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = {
+                        Text(
+                            text = "Scan",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = {
+                        Text(
+                            text = "My QR",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp
+                        )
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Content
+            Crossfade(
+                targetState = selectedTab,
+                label = "QrSheetTabCrossfade",
+                modifier = Modifier.weight(1f)
+            ) { tab ->
+                when (tab) {
+                    0 -> ScanTabContent(
+                        accent = accent,
+                        onScan = { code ->
+                            val qr = VerificationService.verifyScannedQR(code)
+                            if (qr != null && viewModel.beginQRVerification(qr)) {
+                                onDismiss()
+                            }
+                        }
+                    )
+                    1 -> MyQrTabContent(
+                        qrString = qrString,
+                        nickname = nickname,
+                        accent = accent
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun VerificationSheet(
     isPresented: Boolean,
     onDismiss: () -> Unit,

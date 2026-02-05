@@ -248,8 +248,63 @@ class DataManager(private val context: Context) {
         return _geohashBlockedUsers.contains(pubkeyHex)
     }
     
+    // MARK: - Group Nickname Management
+
+    fun saveGroupNickname(geohash: String, nickname: String) {
+        prefs.edit().putString("group_nick_$geohash", nickname).apply()
+    }
+
+    fun loadGroupNickname(geohash: String): String? {
+        return prefs.getString("group_nick_$geohash", null)
+    }
+
+    fun loadAllGroupNicknames(): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        prefs.all.forEach { (key, value) ->
+            if (key.startsWith("group_nick_") && value is String) {
+                val geohash = key.removePrefix("group_nick_")
+                result[geohash] = value
+            }
+        }
+        return result
+    }
+
+    // MARK: - Custom Groups Management
+
+    fun saveCustomGroups(groups: Set<String>) {
+        prefs.edit().putStringSet("custom_groups", groups).apply()
+    }
+
+    fun loadCustomGroups(): Set<String> {
+        return prefs.getStringSet("custom_groups", emptySet()) ?: emptySet()
+    }
+
+    fun removeCustomGroup(geohash: String) {
+        val groups = loadCustomGroups().toMutableSet()
+        groups.remove(geohash)
+        saveCustomGroups(groups)
+        prefs.edit().remove("group_nick_$geohash").apply()
+    }
+
+    // MARK: - Geographic Groups Management
+
+    fun saveGeographicGroups(groups: Set<String>) {
+        prefs.edit().putStringSet("geographic_groups", groups).apply()
+    }
+
+    fun loadGeographicGroups(): Set<String> {
+        return prefs.getStringSet("geographic_groups", emptySet()) ?: emptySet()
+    }
+
+    fun removeGeographicGroup(geohash: String) {
+        val groups = loadGeographicGroups().toMutableSet()
+        groups.remove(geohash)
+        saveGeographicGroups(groups)
+        prefs.edit().remove("group_nick_$geohash").apply()
+    }
+
     // MARK: - Emergency Clear
-    
+
     fun clearAllData() {
         _channelCreators.clear()
         _favoritePeers.clear()

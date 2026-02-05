@@ -40,8 +40,10 @@ import com.roman.zemzeme.onboarding.PermissionExplanationScreen
 import com.roman.zemzeme.onboarding.PermissionManager
 import com.roman.zemzeme.ui.ChatScreen
 import com.roman.zemzeme.ui.ChatViewModel
+import com.roman.zemzeme.ui.HomeScreen
 import com.roman.zemzeme.ui.OrientationAwareActivity
 import com.roman.zemzeme.ui.theme.ZemzemeTheme
+import androidx.activity.compose.BackHandler
 import com.roman.zemzeme.nostr.PoWPreferenceManager
 import com.roman.zemzeme.services.VerificationService
 import kotlinx.coroutines.delay
@@ -302,27 +304,45 @@ class MainActivity : OrientationAwareActivity() {
             }
 
             OnboardingState.CHECKING, OnboardingState.INITIALIZING, OnboardingState.COMPLETE -> {
-                // Set up back navigation handling for the chat screen
-                val backCallback = object : OnBackPressedCallback(true) {
-                    override fun handleOnBackPressed() {
-                        // Let ChatViewModel handle navigation state
+                val isInChat by mainViewModel.isInChat.collectAsState()
+
+                if (isInChat) {
+                    BackHandler {
+                        // Let ChatViewModel handle internal navigation first (close sheets, exit channels)
                         val handled = chatViewModel.handleBackPressed()
                         if (!handled) {
-                            // If ChatViewModel doesn't handle it, disable this callback
-                            // and let the system handle it (which will exit the app)
-                            this.isEnabled = false
-                            onBackPressedDispatcher.onBackPressed()
-                            this.isEnabled = true
+                            mainViewModel.exitChat()
                         }
                     }
+                    ChatScreen(
+                        viewModel = chatViewModel,
+                        isBluetoothEnabled = bluetoothStatus == BluetoothStatus.ENABLED,
+                        onBackToHome = { mainViewModel.exitChat() }
+                    )
+                } else {
+                    HomeScreen(
+                        chatViewModel = chatViewModel,
+                        onGroupSelected = { mainViewModel.enterChat() },
+                        onSettingsClick = { chatViewModel.showAppInfo() },
+                        onRefreshAccount = { chatViewModel.panicClearAllData() },
+                        onCityChosen = { geohash ->
+                            // Reverse geocode the chosen geohash to get city name
+                            lifecycleScope.launch {
+                                val cityName = try {
+                                    val (lat, lon) = com.roman.zemzeme.geohash.Geohash.decodeToCenter(geohash)
+                                    val geocoder = com.roman.zemzeme.geohash.GeocoderFactory.get(context)
+                                    val addresses = geocoder.getFromLocation(lat, lon, 1)
+                                    addresses.firstOrNull()?.locality
+                                        ?: addresses.firstOrNull()?.subAdminArea
+                                        ?: addresses.firstOrNull()?.adminArea
+                                        ?: addresses.firstOrNull()?.countryName
+                                } catch (_: Exception) { null }
+                                val nickname = cityName ?: geohash
+                                chatViewModel.addGeographicGroup(geohash, nickname)
+                            }
+                        }
+                    )
                 }
-
-                // Add the callback - this will be automatically removed when the activity is destroyed
-                onBackPressedDispatcher.addCallback(this, backCallback)
-                ChatScreen(
-                    viewModel = chatViewModel,
-                    isBluetoothEnabled = bluetoothStatus == BluetoothStatus.ENABLED
-                )
             }
             
             OnboardingState.ERROR -> {
@@ -813,14 +833,15 @@ class MainActivity : OrientationAwareActivity() {
             shouldOpenPrivateChat -> {
                 val peerID = intent.getStringExtra(com.roman.zemzeme.ui.NotificationManager.EXTRA_PEER_ID)
                 val senderNickname = intent.getStringExtra(com.roman.zemzeme.ui.NotificationManager.EXTRA_SENDER_NICKNAME)
-                
+
                 if (peerID != null) {
                     Log.d("MainActivity", "Opening private chat with $senderNickname (peerID: $peerID) from notification")
-                    
-                    // Open the private chat sheet with this peer
+
+                    // Navigate into chat and open the private chat sheet with this peer
+                    mainViewModel.enterChat()
                     chatViewModel.showMeshPeerList()
                     chatViewModel.showPrivateChatSheet(peerID)
-                    
+
                     // Clear notifications for this sender since user is now viewing the chat
                     chatViewModel.clearNotificationsForSender(peerID)
                 }
@@ -828,10 +849,13 @@ class MainActivity : OrientationAwareActivity() {
             
             shouldOpenGeohashChat -> {
                 val geohash = intent.getStringExtra(com.roman.zemzeme.ui.NotificationManager.EXTRA_GEOHASH)
-                
+
                 if (geohash != null) {
                     Log.d("MainActivity", "Opening geohash chat #$geohash from notification")
-                    
+
+                    // Navigate into chat
+                    mainViewModel.enterChat()
+
                     // Switch to the geohash channel - create appropriate geohash channel level
                     val level = when (geohash.length) {
                         7 -> com.roman.zemzeme.geohash.GeohashChannelLevel.BLOCK

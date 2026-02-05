@@ -207,6 +207,8 @@ class ChatViewModel(
 
 
 
+    val myPeerID: String get() = meshService.myPeerID
+
     val messages: StateFlow<List<ZemzemeMessage>> = state.messages
     val connectedPeers: StateFlow<List<String>> = state.connectedPeers
     val nickname: StateFlow<String> = state.nickname
@@ -243,6 +245,9 @@ class ChatViewModel(
     val geohashPeople: StateFlow<List<GeoPerson>> = state.geohashPeople
     val teleportedGeo: StateFlow<Set<String>> = state.teleportedGeo
     val geohashParticipantCounts: StateFlow<Map<String, Int>> = state.geohashParticipantCounts
+    val customGroups: StateFlow<Set<String>> = state.customGroups
+    val geographicGroups: StateFlow<Set<String>> = state.geographicGroups
+    val groupNicknames: StateFlow<Map<String, String>> = state.groupNicknames
     
     // P2P topic states for connection status UI (delegated from geohashViewModel)
     val p2pTopicStates: StateFlow<Map<String, com.roman.zemzeme.p2p.TopicState>> get() = geohashViewModel.p2pTopicStates
@@ -324,6 +329,11 @@ class ChatViewModel(
         state.setFavoritePeers(dataManager.favoritePeers.toSet())
         dataManager.loadBlockedUsers()
         dataManager.loadGeohashBlockedUsers()
+
+        // Load custom groups, geographic groups, and nicknames
+        state.setCustomGroups(dataManager.loadCustomGroups())
+        state.setGeographicGroups(dataManager.loadGeographicGroups())
+        state.setGroupNicknames(dataManager.loadAllGroupNicknames())
 
         // Log all favorites at startup
         dataManager.logAllFavorites()
@@ -1112,7 +1122,10 @@ class ChatViewModel(
         channelManager.clearAllChannels()
         privateChatManager.clearAllPrivateChats()
         dataManager.clearAllData()
-        
+
+        // Clear process-wide in-memory message store
+        com.roman.zemzeme.services.AppStateStore.clear()
+
         // Clear seen message store
         try {
             com.roman.zemzeme.services.SeenMessageStore.getInstance(getApplication()).clear()
@@ -1320,8 +1333,117 @@ class ChatViewModel(
         geohashViewModel.blockUserInGeohash(targetNickname)
     }
 
+    // MARK: - Group Management (HomeScreen)
+
+    private val geohashBase32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+
+    fun createGroup(nickname: String): String {
+        val geohash = buildString {
+            repeat(6) { append(geohashBase32[Random.nextInt(geohashBase32.length)]) }
+        }
+        dataManager.saveGroupNickname(geohash, nickname)
+        val groups = state.getCustomGroupsValue().toMutableSet()
+        groups.add(geohash)
+        dataManager.saveCustomGroups(groups)
+        state.setCustomGroups(groups)
+        state.setGroupNicknames(dataManager.loadAllGroupNicknames())
+        return geohash
+    }
+
+    fun joinGroup(geohash: String, nickname: String) {
+        dataManager.saveGroupNickname(geohash, nickname)
+        val groups = state.getCustomGroupsValue().toMutableSet()
+        groups.add(geohash)
+        dataManager.saveCustomGroups(groups)
+        state.setCustomGroups(groups)
+        state.setGroupNicknames(dataManager.loadAllGroupNicknames())
+    }
+
+    fun renameGroup(geohash: String, newNickname: String) {
+        dataManager.saveGroupNickname(geohash, newNickname)
+        state.setGroupNicknames(dataManager.loadAllGroupNicknames())
+    }
+
+    fun removeGroup(geohash: String) {
+        dataManager.removeCustomGroup(geohash)
+        state.setCustomGroups(dataManager.loadCustomGroups())
+        state.setGroupNicknames(dataManager.loadAllGroupNicknames())
+    }
+
+    fun addGeographicGroup(geohash: String, nickname: String) {
+        dataManager.saveGroupNickname(geohash, nickname)
+        val groups = state.getGeographicGroupsValue().toMutableSet()
+        groups.add(geohash)
+        dataManager.saveGeographicGroups(groups)
+        state.setGeographicGroups(groups)
+        state.setGroupNicknames(dataManager.loadAllGroupNicknames())
+    }
+
+    fun removeGeographicGroup(geohash: String) {
+        dataManager.removeGeographicGroup(geohash)
+        state.setGeographicGroups(dataManager.loadGeographicGroups())
+        state.setGroupNicknames(dataManager.loadAllGroupNicknames())
+    }
+
+    fun navigateToMesh() {
+        selectLocationChannel(com.roman.zemzeme.geohash.ChannelID.Mesh)
+    }
+
+    fun navigateToLocationChannel(channelID: com.roman.zemzeme.geohash.ChannelID.Location) {
+        selectLocationChannel(channelID)
+    }
+
+    fun navigateToGeohashGroup(geohash: String) {
+        val level = when (geohash.length) {
+            8 -> com.roman.zemzeme.geohash.GeohashChannelLevel.BUILDING
+            7 -> com.roman.zemzeme.geohash.GeohashChannelLevel.BLOCK
+            6 -> com.roman.zemzeme.geohash.GeohashChannelLevel.NEIGHBORHOOD
+            5 -> com.roman.zemzeme.geohash.GeohashChannelLevel.CITY
+            4 -> com.roman.zemzeme.geohash.GeohashChannelLevel.PROVINCE
+            else -> com.roman.zemzeme.geohash.GeohashChannelLevel.NEIGHBORHOOD
+        }
+        val channel = com.roman.zemzeme.geohash.GeohashChannel(level, geohash)
+        selectLocationChannel(com.roman.zemzeme.geohash.ChannelID.Location(channel))
+    }
+
+    fun navigateToPrivateChat(peerID: String) {
+        showPrivateChatSheet(peerID)
+    }
+
+    fun getLastMeshMessage(): ZemzemeMessage? {
+        return state.getMessagesValue().lastOrNull()
+    }
+
+    fun getLastPrivateMessage(peerID: String): ZemzemeMessage? {
+        return state.getPrivateChatsValue()[peerID]?.lastOrNull()
+    }
+
+    fun clearMeshHistory() {
+        state.setMessages(emptyList())
+    }
+
+    fun clearGeohashHistory(geohash: String) {
+        val key = "geo:$geohash"
+        val updated = state.getChannelMessagesValue().toMutableMap()
+        updated.remove(key)
+        state.setChannelMessages(updated)
+    }
+
+    fun clearPrivateChatHistory(peerID: String) {
+        messageManager.clearPrivateMessages(peerID)
+    }
+
+    fun deletePrivateChat(peerID: String) {
+        val chats = state.getPrivateChatsValue().toMutableMap()
+        chats.remove(peerID)
+        state.setPrivateChats(chats)
+        val unread = state.getUnreadPrivateMessagesValue().toMutableSet()
+        unread.remove(peerID)
+        state.setUnreadPrivateMessages(unread)
+    }
+
     // MARK: - Navigation Management
-    
+
     fun showAppInfo() {
         state.setShowAppInfo(true)
     }

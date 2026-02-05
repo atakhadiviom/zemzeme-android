@@ -72,11 +72,11 @@ fun MessagesList(
     onImageClick: ((String, List<String>, Int) -> Unit)? = null
 ) {
     val listState = rememberLazyListState()
-    
+
     // Track if this is the first time messages are being loaded
     var hasScrolledToInitialPosition by remember { mutableStateOf(false) }
     var followIncomingMessages by remember { mutableStateOf(true) }
-    
+
     // Smart scroll: auto-scroll to bottom for initial load, then follow unless user scrolls away
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -89,7 +89,7 @@ fun MessagesList(
             }
         }
     }
-    
+
     // Track whether user has scrolled away from the latest messages
     val isAtLatest by remember {
         derivedStateOf {
@@ -101,7 +101,7 @@ fun MessagesList(
         followIncomingMessages = isAtLatest
         onScrolledUpChanged?.invoke(!isAtLatest)
     }
-    
+
     // Force scroll to bottom when requested (e.g., when user sends a message)
     LaunchedEffect(forceScrollToBottom) {
         if (messages.isNotEmpty()) {
@@ -110,12 +110,12 @@ fun MessagesList(
             listState.scrollToItem(0)
         }
     }
-    
+
     LazyColumn(
         state = listState,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = modifier,
+        modifier = modifier.fillMaxSize(),
         reverseLayout = true
     ) {
         items(

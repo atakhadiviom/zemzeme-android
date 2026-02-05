@@ -11,6 +11,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * The foreground Mesh service updates this store; UI subscribes/hydrates from it.
  */
 object AppStateStore {
+    // Timestamp of last account refresh — messages older than this are ignored
+    @Volatile
+    private var resetTimestamp: Long = 0L
+
     // Global de-dup set by message id to avoid duplicate keys in Compose lists
     private val seenMessageIds = mutableSetOf<String>()
     // Connected peer IDs (mesh ephemeral IDs)
@@ -35,6 +39,7 @@ object AppStateStore {
 
     fun addPublicMessage(msg: ZemzemeMessage) {
         synchronized(this) {
+            if (msg.timestamp.time < resetTimestamp) return
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)
             _publicMessages.value = _publicMessages.value + msg
@@ -43,6 +48,7 @@ object AppStateStore {
 
     fun addPrivateMessage(peerID: String, msg: ZemzemeMessage) {
         synchronized(this) {
+            if (msg.timestamp.time < resetTimestamp) return
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)
             val map = _privateMessages.value.toMutableMap()
@@ -87,6 +93,7 @@ object AppStateStore {
 
     fun addChannelMessage(channel: String, msg: ZemzemeMessage) {
         synchronized(this) {
+            if (msg.timestamp.time < resetTimestamp) return
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)
             val map = _channelMessages.value.toMutableMap()
@@ -96,9 +103,10 @@ object AppStateStore {
         }
     }
 
-    // Clear all in-memory state (used for full app shutdown)
+    // Clear all in-memory state and set reset timestamp to reject old messages from mesh
     fun clear() {
         synchronized(this) {
+            resetTimestamp = System.currentTimeMillis()
             seenMessageIds.clear()
             _peers.value = emptyList()
             _publicMessages.value = emptyList()

@@ -32,6 +32,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roman.zemzeme.geohash.isMeshView
+import com.roman.zemzeme.BuildConfig
 import com.roman.zemzeme.model.ZemzemeMessage
 import com.roman.zemzeme.onboarding.NetworkStatus
 import com.roman.zemzeme.onboarding.NetworkStatusManager
@@ -741,9 +742,9 @@ private fun ChatDialogs(
         isPresented = showAppInfo,
         onDismiss = onAppInfoDismiss,
         isBluetoothEnabled = isBluetoothEnabled,
-        onShowDebug = { showDebugSheet = true }
+        onShowDebug = if (BuildConfig.DEBUG) ({ showDebugSheet = true }) else null
     )
-    if (showDebugSheet) {
+    if (BuildConfig.DEBUG && showDebugSheet) {
         com.roman.zemzeme.ui.debug.DebugSettingsSheet(
             isPresented = showDebugSheet,
             onDismiss = { showDebugSheet = false },
