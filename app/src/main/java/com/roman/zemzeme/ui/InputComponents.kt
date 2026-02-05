@@ -171,6 +171,7 @@ fun MessageInput(
     currentChannel: String?,
     nickname: String,
     showMediaButtons: Boolean,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -195,14 +196,15 @@ fun MessageInput(
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
+                enabled = enabled,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = colorScheme.primary,
+                    color = if (enabled) colorScheme.primary else colorScheme.onSurface.copy(alpha = 0.3f),
                     fontFamily = FontFamily.Monospace
                 ),
                 cursorBrush = SolidColor(if (isRecording) Color.Transparent else colorScheme.primary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { 
-                    if (hasText) onSend() // Only send if there's text
+                keyboardActions = KeyboardActions(onSend = {
+                    if (hasText && enabled) onSend()
                 }),
                 visualTransformation = CombinedVisualTransformation(
                     listOf(SlashCommandVisualTransformation(), MentionVisualTransformation())
@@ -254,7 +256,7 @@ fun MessageInput(
         Spacer(modifier = Modifier.width(8.dp)) // Reduced spacing
         
         // Voice and image buttons when no text (only visible in Mesh chat)
-        if (value.text.isEmpty() && showMediaButtons) {
+        if (value.text.isEmpty() && showMediaButtons && enabled) {
             // Hold-to-record microphone
             val bg = if (colorScheme.background == Color.Black) Color(0xFF00FF00).copy(alpha = 0.75f) else Color(0xFF008000).copy(alpha = 0.75f)
 
@@ -317,8 +319,8 @@ fun MessageInput(
         } else {
             // Send button with enabled/disabled state
             IconButton(
-                onClick = { if (hasText) onSend() }, // Only execute if there's text
-                enabled = hasText, // Enable only when there's text
+                onClick = { if (hasText && enabled) onSend() },
+                enabled = hasText && enabled,
                 modifier = Modifier.size(32.dp)
             ) {
                 // Update send button to match input field colors

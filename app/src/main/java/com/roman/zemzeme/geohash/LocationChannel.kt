@@ -67,6 +67,11 @@ sealed class ChannelID {
             is Location -> channel.geohash
         }
     
+    /**
+     * True when this channel uses BLE Mesh as its transport (i.e. not a geohash/internet channel).
+     */
+    val isMesh: Boolean get() = this is Mesh
+
     override fun equals(other: Any?): Boolean {
         return when {
             this is Mesh && other is Mesh -> true
@@ -82,3 +87,9 @@ sealed class ChannelID {
         }
     }
 }
+
+/**
+ * Returns true when the selected channel is BLE Mesh (including the null default).
+ * null means no explicit selection, which defaults to the main #mesh timeline.
+ */
+val ChannelID?.isMeshView: Boolean get() = this == null || this.isMesh
