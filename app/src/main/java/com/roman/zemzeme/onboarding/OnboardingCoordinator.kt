@@ -1,7 +1,5 @@
 package com.roman.zemzeme.onboarding
 
-import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
@@ -13,13 +11,17 @@ import kotlinx.coroutines.launch
 
 /**
  * Coordinates the complete onboarding flow including permission explanation,
- * permission requests, and initialization of the mesh service
+ * permission requests, and initialization of the mesh service.
+ *
+ * The permission explanation screen now handles all permissions inline
+ * (including background location and battery optimization) via sequential
+ * per-category requests. This coordinator provides the launchers and
+ * completion logic.
  */
 class OnboardingCoordinator(
     private val activity: ComponentActivity,
     private val permissionManager: PermissionManager,
     private val onOnboardingComplete: () -> Unit,
-    private val onBackgroundLocationRequired: () -> Unit,
     private val onOnboardingFailed: (String) -> Unit
 ) {
 
@@ -35,9 +37,6 @@ class OnboardingCoordinator(
         setupBackgroundLocationLauncher()
     }
 
-    /**
-     * Setup the permission request launcher
-     */
     private fun setupPermissionLauncher() {
         permissionLauncher = activity.registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -55,177 +54,59 @@ class OnboardingCoordinator(
     }
 
     /**
-     * Start the onboarding process
+     * Start the onboarding process — called when user clicks "Continue"
+     * after all required permissions are granted.
      */
     fun startOnboarding() {
         Log.d(TAG, "Starting onboarding process")
         permissionManager.logPermissionStatus()
 
         if (permissionManager.areRequiredPermissionsGranted()) {
-            if (shouldRequestBackgroundLocation()) {
-                Log.d(TAG, "Foreground permissions granted; background location recommended")
-                onBackgroundLocationRequired()
-            } else {
-                Log.d(TAG, "Required permissions already granted, completing onboarding")
-                completeOnboarding()
-            }
+            Log.d(TAG, "Required permissions granted, completing onboarding")
+            completeOnboarding()
         } else {
             Log.d(TAG, "Missing permissions, need to start explanation flow")
-            // The explanation screen will be shown by the calling activity
         }
     }
 
     /**
-     * Called when user accepts the permission explanation
+     * Request specific permissions for a single category.
+     * Called by the permission explanation screen during sequential granting.
      */
-    fun requestPermissions() {
-        Log.d(TAG, "User accepted permission explanation, requesting permissions")
-        
-        // Required permissions
-        val missingRequired = permissionManager.getMissingPermissions()
-
-        // Optional permissions (ask, but do not block if denied)
-        val optionalToRequest = permissionManager
-            .getOptionalPermissions()
-            .filter { !permissionManager.isPermissionGranted(it) }
-
-        val missingPermissions = (missingRequired + optionalToRequest).distinct()
-
-        if (missingPermissions.isEmpty()) {
-            if (shouldRequestBackgroundLocation()) {
-                onBackgroundLocationRequired()
-            } else {
-                completeOnboarding()
-            }
-            return
-        }
-
-        Log.d(TAG, "Requesting ${missingPermissions.size} permissions")
-        permissionLauncher?.launch(missingPermissions.toTypedArray())
+    fun requestSpecificPermissions(permissions: List<String>) {
+        val missing = permissions.filter { !permissionManager.isPermissionGranted(it) }
+        if (missing.isEmpty()) return
+        Log.d(TAG, "Requesting specific permissions: $missing")
+        permissionLauncher?.launch(missing.toTypedArray())
     }
 
     /**
-     * Handle permission request results
+     * Request background location permission.
      */
-    private fun handlePermissionResults(permissions: Map<String, Boolean>) {
-        Log.d(TAG, "Received permission results:")
-        permissions.forEach { (permission, granted) ->
-            Log.d(TAG, "  $permission: ${if (granted) "GRANTED" else "DENIED"}")
-        }
-
-        val allGranted = permissions.values.all { it }
-        val criticalPermissions = getCriticalPermissions()
-        val criticalGranted = criticalPermissions.all { permissions[it] == true }
-
-        when {
-            criticalGranted -> {
-                if (shouldRequestBackgroundLocation()) {
-                    Log.d(TAG, "Foreground permissions granted; requesting background location next")
-                    onBackgroundLocationRequired()
-                    return
-                }
-                if (allGranted) {
-                    Log.d(TAG, "All permissions granted successfully")
-                    completeOnboarding()
-                } else {
-                    Log.d(TAG, "Critical permissions granted, can proceed with limited functionality")
-                    showPartialPermissionWarning(permissions)
-                }
-            }
-            else -> {
-                Log.d(TAG, "Critical permissions denied")
-                handlePermissionDenial(permissions)
-            }
-        }
-    }
-
     fun requestBackgroundLocation() {
         val permission = permissionManager.getBackgroundLocationPermission()
         if (permission == null) {
-            completeOnboarding()
+            Log.d(TAG, "Background location not needed on this API level")
             return
         }
         Log.d(TAG, "Requesting background location permission")
         backgroundLocationLauncher?.launch(permission)
     }
 
+    /**
+     * Permission results are handled by the explanation screen via lifecycle
+     * observer. We just log here.
+     */
+    private fun handlePermissionResults(permissions: Map<String, Boolean>) {
+        Log.d(TAG, "Received permission results:")
+        permissions.forEach { (permission, granted) ->
+            Log.d(TAG, "  $permission: ${if (granted) "GRANTED" else "DENIED"}")
+        }
+    }
+
     private fun handleBackgroundLocationResult(granted: Boolean) {
-        if (granted) {
-            Log.d(TAG, "Background location permission granted")
-        } else {
-            Log.w(TAG, "Background location permission denied; continuing without it")
-        }
-        completeOnboarding()
-    }
-
-    fun skipBackgroundLocation() {
-        Log.d(TAG, "User skipped background location permission")
         BackgroundLocationPreferenceManager.setSkipped(activity, true)
-        completeOnboarding()
-    }
-
-    fun checkBackgroundLocationAndProceed() {
-        if (!shouldRequestBackgroundLocation()) {
-            completeOnboarding()
-        }
-    }
-
-    private fun shouldRequestBackgroundLocation(): Boolean {
-        return permissionManager.needsBackgroundLocationPermission() &&
-            !permissionManager.isBackgroundLocationGranted() &&
-            !BackgroundLocationPreferenceManager.isSkipped(activity)
-    }
-
-    /**
-     * Get the list of critical permissions that are absolutely required
-     */
-    private fun getCriticalPermissions(): List<String> {
-        // For zemzeme, Bluetooth and location permissions are critical
-        // Notifications are nice-to-have but not critical and are not included in getRequiredPermissions()
-        return permissionManager.getRequiredPermissions()
-    }
-
-    /**
-     * Show warning when some permissions are granted but others are denied
-     */
-    private fun showPartialPermissionWarning(permissions: Map<String, Boolean>) {
-        val deniedPermissions = permissions.filter { !it.value }.keys
-        val message = buildString {
-            append("Some permissions were denied:\n")
-            deniedPermissions.forEach { permission ->
-                append("- ${getPermissionDisplayName(permission)}\n")
-            }
-            append("\nZemzeme may not work properly without all permissions.")
-        }
-        
-        Log.w(TAG, "Partial permissions granted: $message")
-        
-        // For now, we'll proceed anyway and let the user experience the limitations
-        // In a production app, you might want to show a dialog explaining the limitations
-        completeOnboarding()
-    }
-
-    /**
-     * Handle permission denial scenarios
-     */
-    private fun handlePermissionDenial(permissions: Map<String, Boolean>) {
-        val deniedCritical = permissions.filter { !it.value && getCriticalPermissions().contains(it.key) }
-        
-        if (deniedCritical.isNotEmpty()) {
-            val message = buildString {
-                append("Critical permissions were denied. zemzeme requires these permissions to function:\n")
-                deniedCritical.keys.forEach { permission ->
-                    append("- ${getPermissionDisplayName(permission)}\n")
-                }
-                append("\nPlease grant these permissions in Settings to use zemzeme.")
-            }
-            
-            Log.e(TAG, "Critical permissions denied: $deniedCritical")
-            onOnboardingFailed(message)
-        } else {
-            // Shouldn't happen given our logic above, but handle gracefully
-            completeOnboarding()
-        }
+        Log.d(TAG, "Background location permission ${if (granted) "granted" else "denied"}")
     }
 
     /**
@@ -233,16 +114,11 @@ class OnboardingCoordinator(
      */
     private fun completeOnboarding() {
         Log.d(TAG, "Completing onboarding process")
-        
-        // Mark onboarding as complete
         permissionManager.markOnboardingComplete()
-        
-        // Log final permission status
         permissionManager.logPermissionStatus()
-        
-        // Notify completion with a small delay to ensure everything is ready
+
         activity.lifecycleScope.launch {
-            kotlinx.coroutines.delay(100) // Small delay for UI state to settle
+            kotlinx.coroutines.delay(100)
             onOnboardingComplete()
         }
     }
@@ -263,22 +139,6 @@ class OnboardingCoordinator(
         }
     }
 
-    /**
-     * Convert permission string to user-friendly display name
-     */
-    private fun getPermissionDisplayName(permission: String): String {
-        return when {
-            permission.contains("BLUETOOTH") -> "Bluetooth/Nearby Devices"
-            permission.contains("BACKGROUND") -> "Background Location"
-            permission.contains("LOCATION") -> "Location (for Bluetooth scanning)"
-            permission.contains("NOTIFICATION") -> "Notifications"
-            else -> permission.substringAfterLast(".")
-        }
-    }
-
-    /**
-     * Get diagnostic information for troubleshooting
-     */
     fun getDiagnostics(): String {
         return buildString {
             appendLine("Onboarding Coordinator Diagnostics:")
