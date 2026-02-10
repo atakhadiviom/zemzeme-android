@@ -190,7 +190,9 @@ class PermissionManager(private val context: Context) {
                 description = context.getString(R.string.perm_nearby_devices_desc),
                 permissions = bluetoothPermissions,
                 isGranted = bluetoothPermissions.all { isPermissionGranted(it) },
-                systemDescription = context.getString(R.string.perm_nearby_devices_system)
+                systemDescription = context.getString(R.string.perm_nearby_devices_system),
+                isRequired = true,
+                benefitDescription = context.getString(R.string.perm_benefit_nearby_devices)
             )
         )
 
@@ -206,7 +208,9 @@ class PermissionManager(private val context: Context) {
                 description = context.getString(R.string.perm_location_desc),
                 permissions = locationPermissions,
                 isGranted = locationPermissions.all { isPermissionGranted(it) },
-                systemDescription = context.getString(R.string.perm_location_system)
+                systemDescription = context.getString(R.string.perm_location_system),
+                isRequired = true,
+                benefitDescription = context.getString(R.string.perm_benefit_location)
             )
         )
 
@@ -218,7 +222,8 @@ class PermissionManager(private val context: Context) {
                     description = context.getString(R.string.perm_background_location_desc),
                     permissions = backgroundPermission,
                     isGranted = backgroundPermission.all { isPermissionGranted(it) },
-                    systemDescription = context.getString(R.string.perm_background_location_system)
+                    systemDescription = context.getString(R.string.perm_background_location_system),
+                    benefitDescription = context.getString(R.string.perm_benefit_background_location)
                 )
             )
         }
@@ -231,7 +236,8 @@ class PermissionManager(private val context: Context) {
                     description = context.getString(R.string.perm_notifications_desc),
                     permissions = listOf(Manifest.permission.POST_NOTIFICATIONS),
                     isGranted = isPermissionGranted(Manifest.permission.POST_NOTIFICATIONS),
-                    systemDescription = context.getString(R.string.perm_notifications_system)
+                    systemDescription = context.getString(R.string.perm_notifications_system),
+                    benefitDescription = context.getString(R.string.perm_benefit_notifications)
                 )
             )
         }
@@ -246,7 +252,8 @@ class PermissionManager(private val context: Context) {
                     description = context.getString(R.string.perm_battery_desc),
                     permissions = listOf("BATTERY_OPTIMIZATION"), // Custom identifier
                     isGranted = isBatteryOptimizationDisabled(),
-                    systemDescription = context.getString(R.string.perm_battery_system)
+                    systemDescription = context.getString(R.string.perm_battery_system),
+                    benefitDescription = context.getString(R.string.perm_benefit_battery_optimization)
                 )
             )
         }
@@ -300,7 +307,9 @@ data class PermissionCategory(
     val description: String,
     val permissions: List<String>,
     val isGranted: Boolean,
-    val systemDescription: String
+    val systemDescription: String,
+    val isRequired: Boolean = false,
+    val benefitDescription: String = ""
 )
 
 enum class PermissionType(@StringRes val nameRes: Int) {

@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import com.roman.zemzeme.ui.theme.NunitoFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -63,7 +64,7 @@ fun InitializingScreen(modifier: Modifier) {
             Text(
                 text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineLarge.copy(
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = NunitoFontFamily,
                     fontWeight = FontWeight.Bold,
                     color = colorScheme.primary
                 ),
@@ -92,7 +93,7 @@ fun InitializingScreen(modifier: Modifier) {
                 Text(
                     text = stringResource(R.string.initializing_mesh_network),
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = NunitoFontFamily,
                         color = colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 )
@@ -102,7 +103,7 @@ fun InitializingScreen(modifier: Modifier) {
                     Text(
                         text = stringResource(R.string.dot),
                         style = MaterialTheme.typography.bodyLarge.copy(
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = NunitoFontFamily,
                             color = colorScheme.onSurface.copy(alpha = alpha)
                         )
                     )
@@ -127,7 +128,7 @@ fun InitializingScreen(modifier: Modifier) {
                     Text(
                         text = stringResource(R.string.setting_up_bluetooth),
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = NunitoFontFamily,
                             color = colorScheme.onSurface.copy(alpha = 0.8f)
                         ),
                         textAlign = TextAlign.Center
@@ -136,7 +137,7 @@ fun InitializingScreen(modifier: Modifier) {
                     Text(
                         text = stringResource(R.string.should_take_seconds),
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = NunitoFontFamily,
                             color = colorScheme.onSurface.copy(alpha = 0.6f)
                         ),
                         textAlign = TextAlign.Center
@@ -184,7 +185,7 @@ fun InitializationErrorScreen(
             Text(
                 text = stringResource(R.string.setup_not_complete),
                 style = MaterialTheme.typography.headlineSmall.copy(
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = NunitoFontFamily,
                     fontWeight = FontWeight.Bold,
                     color = colorScheme.error
                 ),
@@ -201,7 +202,7 @@ fun InitializationErrorScreen(
                 Text(
                     text = errorMessage,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = NunitoFontFamily,
                         color = colorScheme.onSurface
                     ),
                     modifier = Modifier.padding(16.dp),
@@ -220,7 +221,7 @@ fun InitializationErrorScreen(
                     Text(
                         text = stringResource(R.string.try_again),
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = NunitoFontFamily,
                             fontWeight = FontWeight.Bold
                         ),
                         modifier = Modifier.padding(vertical = 4.dp)
@@ -234,7 +235,7 @@ fun InitializationErrorScreen(
                     Text(
                         text = stringResource(R.string.open_settings),
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = NunitoFontFamily
                         ),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
