@@ -2,17 +2,17 @@
   <img src="docs/logo.png" alt="Zemzeme" width="160"/>
 </p>
 
-<h1 align="center">Zemzeme</h1>
+<h1 align="center"><a href="https://zemzeme.app">Zemzeme</a></h1>
 
 <p align="center"><strong>Private, serverless messaging — no accounts, no internet required.</strong></p>
 
-Zemzeme is a fork of [bitchat](https://github.com/permissionlesstech/bitchat-android) (v1.7.0) for Android, extended with a second internet-capable transport layer built on [libp2p](https://libp2p.io). It supports three independent communication methods that can operate simultaneously: offline Bluetooth mesh, direct peer-to-peer over the internet (via libp2p + ICE), and relay-based messaging via the Nostr protocol. All messages are end-to-end encrypted. No registration, no phone number, no central server.
+[Zemzeme](https://zemzeme.app) is a fork of [bitchat](https://github.com/permissionlesstech/bitchat-android) (v1.7.0) for Android, extended with a second internet-capable transport layer built on [libp2p](https://libp2p.io). It supports three independent communication methods that can operate simultaneously: offline Bluetooth mesh, direct peer-to-peer over the internet (via libp2p + ICE), and relay-based messaging via the Nostr protocol. All messages are end-to-end encrypted. No registration, no phone number, no central server.
 
 ---
 
 ## Acknowledgements
 
-Zemzeme stands on the shoulders of the [**bitchat team**](https://github.com/permissionlesstech/bitchat-android) and its contributors. The core BLE mesh architecture, Noise protocol integration, gossip-based relay, and the original application design are their work. We are grateful for their commitment to open, private, decentralised communication.
+[Zemzeme](https://zemzeme.app) stands on the shoulders of the [**bitchat team**](https://github.com/permissionlesstech/bitchat-android) and its contributors. The core BLE mesh architecture, Noise protocol integration, gossip-based relay, and the original application design are their work. We are grateful for their commitment to open, private, decentralised communication.
 
 > **Forked from bitchat v1.7.0**
 
@@ -184,7 +184,7 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 | `READ_MEDIA_IMAGES / AUDIO / VIDEO` | Media sharing |
 | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Reliable background operation |
 
-Zemzeme does **not** access contacts, call logs, SMS, or any external account.
+[Zemzeme](https://zemzeme.app) does **not** access contacts, call logs, SMS, or any external account.
 
 ---
 
@@ -193,7 +193,7 @@ Zemzeme does **not** access contacts, call logs, SMS, or any external account.
 1. **Launch** the app — no registration needed
 2. **Grant permissions** when prompted (Bluetooth, location, notifications)
 3. **Pick a nickname** — used only locally and in messages to peers
-4. The **Bluetooth** group is the local BLE mesh; nearby Zemzeme users appear automatically
+4. The **Bluetooth** group is the local BLE mesh; nearby [Zemzeme](https://zemzeme.app) users appear automatically
 5. Tap **+** on the home screen to join a geohash channel or start a private chat
 6. Scan a peer's **QR code** (from the verification sheet) to confirm their identity
 
@@ -268,5 +268,5 @@ This project inherits the open-source license of the original [bitchat](https://
 
 - **[bitchat](https://github.com/permissionlesstech/bitchat-android)** — The original project this fork is based on. Thank you to the entire bitchat team for building a solid, privacy-first foundation and for making it open source.
 - **[libp2p](https://libp2p.io)** — The modular peer-to-peer networking stack powering the P2P/ICE transport layer.
-- **[Protocol Labs](https://protocol.ai)** — Creators of libp2p, IPFS, and the broader decentralised web infrastructure that Zemzeme benefits from.
+- **[Protocol Labs](https://protocol.ai)** — Creators of libp2p, IPFS, and the broader decentralised web infrastructure that [Zemzeme](https://zemzeme.app) benefits from.
 - **[Nostr Protocol](https://nostr.com)** — Simple, open protocol for decentralised social applications.
